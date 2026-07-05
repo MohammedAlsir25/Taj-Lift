@@ -1,0 +1,48 @@
+{
+  "entities": {
+    "UserAccount": {
+      "title": "User Account",
+      "description": "User account registration data for dispatcher portal",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "password": { "type": "string" },
+        "role": { "type": "string" },
+        "phone": { "type": "string" },
+        "region": { "type": "string" },
+        "profilePic": { "type": "string" }
+      },
+      "required": ["id", "name", "email", "password", "role", "phone", "region"]
+    },
+    "Project": {
+      "title": "Project",
+      "description": "Active elevator installation and maintenance project",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "location": { "type": "string" },
+        "budget": { "type": "number" },
+        "completed": { "type": "number" },
+        "status": { "type": "string", "enum": ["ongoing", "completed", "pending"] },
+        "expenses": {
+          "type": "array",
+          "description": "Logged materials, logistics, labor and repair expenditures"
+        }
+      },
+      "required": ["id", "name", "location", "budget", "completed", "status"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "#/entities/UserAccount",
+      "description": "User account configurations and roles"
+    },
+    "/projects/{projectId}": {
+      "schema": "#/entities/Project",
+      "description": "Elevator project portfolios and their expenses"
+    }
+  }
+}
