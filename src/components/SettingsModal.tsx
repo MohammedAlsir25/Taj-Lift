@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Camera, Moon, Sun, User, Briefcase, Phone, MapPin, CheckCircle, Shield, Award, LogOut, Star } from 'lucide-react';
+import { X, Camera, Moon, Sun, User, Briefcase, Phone, MapPin, CheckCircle, Shield, Award, LogOut, Star, Database, Trash2, RefreshCw, Mail } from 'lucide-react';
 import { useProfile, AVATAR_PRESETS } from './ProfileContext';
 import { Switch } from './Tamagui';
 import LegalModal from './LegalModal';
+import { collection, getDocs, doc, writeBatch } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 
 export default function SettingsModal() {
   const {
@@ -24,7 +26,8 @@ export default function SettingsModal() {
     region,
     setRegion,
     logout,
-    lockSession
+    lockSession,
+    currentUser
   } = useProfile();
 
   const [tempName, setTempName] = useState(name);
@@ -33,31 +36,118 @@ export default function SettingsModal() {
   const [tempRegion, setTempRegion] = useState(region);
   const [showSaveSuccess, setShowSaveSuccess] = useState(false);
 
+  useEffect(() => {
+    if (isSettingsOpen) {
+      setTempName(name || '');
+      setTempRole(role || '');
+      setTempPhone(phone || '');
+      setTempRegion(region || '');
+    }
+  }, [isSettingsOpen, name, role, phone, region]);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (typeof reader.result === 'string') {
+          setProfilePic(reader.result);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const [isLegalOpen, setIsLegalOpen] = useState(false);
   const [legalTab, setLegalTab] = useState<'privacy' | 'terms' | 'cca'>('privacy');
 
-  // App Rating States (in-memory only)
-  const [appRating, setAppRating] = useState<number>(0);
-  const [hoverRating, setHoverRating] = useState<number>(0);
-  const [ratingFeedback, setRatingFeedback] = useState<string>('');
-  const [isRatingSubmitted, setIsRatingSubmitted] = useState<boolean>(false);
-
-  const handleRatingSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (appRating === 0) return;
-    setIsRatingSubmitted(true);
-  };
+  // Loading Screen & Confirmation States
+  const [loadingMessage, setLoadingMessage] = useState<string | null>(null);
+  const [showPurgeConfirm, setShowPurgeConfirm] = useState(false);
 
   const handleSave = () => {
-    setName(tempName);
-    setRole(tempRole);
-    setPhone(tempPhone);
-    setRegion(tempRegion);
-    setShowSaveSuccess(true);
+    setLoadingMessage("Updating your secure personnel profile...");
     setTimeout(() => {
-      setShowSaveSuccess(false);
+      setName(tempName);
+      setRole(tempRole);
+      setPhone(tempPhone);
+      setRegion(tempRegion);
+      setLoadingMessage(null);
+      setShowSaveSuccess(true);
+      setTimeout(() => {
+        setShowSaveSuccess(false);
+        setIsSettingsOpen(false);
+      }, 800);
+    }, 1200);
+  };
+
+  const [isResetting, setIsResetting] = useState(false);
+  const [resetCompleted, setResetCompleted] = useState(false);
+
+  const handleResetDatabase = async () => {
+    setShowPurgeConfirm(false);
+    setLoadingMessage("Purging live database... Deleting mock projects, leads, breakdowns, payments, and schedules...");
+    setIsResetting(true);
+    try {
+      const collectionsToClear = [
+        "projects",
+        "leads",
+        "pm_slots",
+        "breakdowns",
+        "payments",
+        "followups"
+      ];
+      
+      for (const colName of collectionsToClear) {
+        const querySnapshot = await getDocs(collection(db, colName));
+        const batch = writeBatch(db);
+        querySnapshot.forEach((document) => {
+          batch.delete(doc(db, colName, document.id));
+        });
+        await batch.commit();
+        
+        // Also clear local cache to prevent stale render
+        localStorage.removeItem(`taj_cache_${colName}`);
+      }
+      
+      // Clear general sync states
+      localStorage.removeItem("taj_pending_writes");
+      
+      setResetCompleted(true);
+      setLoadingMessage("Workspace primed successfully! Reloading portal application...");
+      setTimeout(() => {
+        setResetCompleted(false);
+        setLoadingMessage(null);
+        // Force reload the page to refresh all active listeners/states
+        window.location.reload();
+      }, 2000);
+    } catch (error) {
+      console.error("Error clearing mock database:", error);
+      setLoadingMessage(null);
+      alert("Failed to reset database: " + (error instanceof Error ? error.message : String(error)));
+    } finally {
+      setIsResetting(false);
+    }
+  };
+
+  const handleLockSession = () => {
+    setLoadingMessage("Securing portal and locking workspace...");
+    setTimeout(() => {
+      lockSession();
+      setLoadingMessage(null);
       setIsSettingsOpen(false);
-    }, 800);
+    }, 1000);
+  };
+
+  const handleSignOut = () => {
+    setLoadingMessage("Terminating session and signing out of Taj Lift Portal...");
+    setTimeout(async () => {
+      await logout();
+      setLoadingMessage(null);
+      setIsSettingsOpen(false);
+    }, 1200);
   };
 
   return (
@@ -113,19 +203,31 @@ export default function SettingsModal() {
               
               {/* Profile Pic Selection */}
               <div className="flex flex-col items-center space-y-3.5">
-                <div className="relative">
+                <div 
+                  className="relative cursor-pointer group"
+                  onClick={() => fileInputRef.current?.click()}
+                  title="Upload profile picture"
+                >
                   <img
                     src={profilePic}
                     alt="Current Avatar"
-                    className="w-20 h-20 rounded-full border-3 border-sky-400 object-cover shadow-xl"
+                    className="w-20 h-20 rounded-full border-3 border-sky-400 object-cover shadow-xl group-hover:brightness-95 transition-all"
                     referrerPolicy="no-referrer"
                   />
-                  <div className={`absolute -bottom-1 -right-1 p-1.5 bg-sky-500 rounded-full text-white shadow-md border-2 ${
+                  <div className={`absolute -bottom-1 -right-1 p-1.5 bg-sky-500 rounded-full text-white shadow-md border-2 group-hover:scale-110 transition-all ${
                     theme === 'light' ? 'border-slate-50' : 'border-slate-900'
                   }`}>
                     <Camera className="w-3.5 h-3.5" />
                   </div>
                 </div>
+
+                <input
+                  type="file"
+                  accept="image/*"
+                  ref={fileInputRef}
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
 
                 {/* Horizontal Quick Presets list */}
                 <div className="w-full flex flex-col space-y-1.5">
@@ -158,6 +260,27 @@ export default function SettingsModal() {
                         )}
                       </button>
                     ))}
+
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      className={`relative rounded-full w-11 h-11 flex items-center justify-center border border-dashed transition-all cursor-pointer hover:scale-105 active:scale-95 ${
+                        !AVATAR_PRESETS.some(p => p.url === profilePic)
+                          ? 'ring-2 ring-sky-400 scale-105 shadow-md shadow-sky-400/20 border-sky-400 text-sky-400'
+                          : 'opacity-70 hover:opacity-100 text-slate-400 border-slate-300'
+                      }`}
+                      title="Upload custom image"
+                    >
+                      {(!AVATAR_PRESETS.some(p => p.url === profilePic) && profilePic.startsWith('data:image/')) ? (
+                        <img
+                          src={profilePic}
+                          alt="Custom Upload"
+                          className="w-full h-full rounded-full object-cover"
+                          referrerPolicy="no-referrer"
+                        />
+                      ) : (
+                        <Camera className="w-4 h-4" />
+                      )}
+                    </button>
                   </div>
                 </div>
               </div>
@@ -235,24 +358,47 @@ export default function SettingsModal() {
                   </div>
                 </div>
 
+                {/* Work Email */}
+                <div className="flex flex-col space-y-1 opacity-80">
+                  <label className={`text-[9px] font-bold uppercase tracking-wider ${
+                    theme === 'light' ? 'text-slate-500' : 'text-white/40'
+                  }`}>Work Email Address (Read-only)</label>
+                  <div className="relative">
+                    <Mail className={`absolute left-3 top-2.5 w-4 h-4 ${theme === 'light' ? 'text-slate-400' : 'text-white/30'}`} />
+                    <input
+                      type="email"
+                      disabled
+                      value={currentUser?.email || ''}
+                      className={`w-full pl-9 pr-4 py-2 text-xs font-semibold rounded-xl border outline-none cursor-not-allowed ${
+                        theme === 'light' 
+                          ? 'bg-slate-100 border-slate-200 text-slate-500' 
+                          : 'bg-white/5 border-white/5 text-white/50'
+                      }`}
+                    />
+                  </div>
+                </div>
+
                 {/* Role */}
                 <div className="flex flex-col space-y-1">
                   <label className={`text-[9px] font-bold uppercase tracking-wider ${
                     theme === 'light' ? 'text-slate-500' : 'text-white/40'
                   }`}>Job Title / Role</label>
                   <div className="relative">
-                    <Briefcase className={`absolute left-3 top-2.5 w-4 h-4 ${theme === 'light' ? 'text-slate-400' : 'text-white/30'}`} />
-                    <input
-                      type="text"
+                    <Briefcase className={`absolute left-3 top-2.5 w-4 h-4 z-10 ${theme === 'light' ? 'text-slate-400' : 'text-white/30'}`} />
+                    <select
                       value={tempRole}
                       onChange={(e) => setTempRole(e.target.value)}
-                      className={`w-full pl-9 pr-4 py-2 text-xs font-semibold rounded-xl border outline-none focus:ring-1 focus:ring-sky-400 transition-all ${
+                      className={`w-full pl-9 pr-4 py-2 text-xs font-bold rounded-xl border outline-none focus:ring-1 focus:ring-sky-400 transition-all cursor-pointer relative ${
                         theme === 'light' 
                           ? 'bg-white border-slate-200 text-slate-800' 
-                          : 'bg-white/5 border-white/10 text-white'
+                          : 'bg-[#151c30] border-white/10 text-white'
                       }`}
-                      placeholder="Enter designation"
-                    />
+                    >
+                      <option value="Field Technician" className={theme === 'light' ? 'text-slate-800' : 'bg-[#151c30] text-white'}>Field Technician</option>
+                      <option value="Maintenance Supervisor" className={theme === 'light' ? 'text-slate-800' : 'bg-[#151c30] text-white'}>Maintenance Supervisor</option>
+                      <option value="Taj Operations Lead" className={theme === 'light' ? 'text-slate-800' : 'bg-[#151c30] text-white'}>Taj Operations Lead</option>
+                      <option value="Regional Director" className={theme === 'light' ? 'text-slate-800' : 'bg-[#151c30] text-white'}>Regional Director</option>
+                    </select>
                   </div>
                 </div>
 
@@ -283,139 +429,23 @@ export default function SettingsModal() {
                     theme === 'light' ? 'text-slate-500' : 'text-white/40'
                   }`}>Assigned Region</label>
                   <div className="relative">
-                    <MapPin className={`absolute left-3 top-2.5 w-4 h-4 ${theme === 'light' ? 'text-slate-400' : 'text-white/30'}`} />
-                    <input
-                      type="text"
+                    <MapPin className={`absolute left-3 top-2.5 w-4 h-4 z-10 ${theme === 'light' ? 'text-slate-400' : 'text-white/30'}`} />
+                    <select
                       value={tempRegion}
                       onChange={(e) => setTempRegion(e.target.value)}
-                      className={`w-full pl-9 pr-4 py-2 text-xs font-semibold rounded-xl border outline-none focus:ring-1 focus:ring-sky-400 transition-all ${
+                      className={`w-full pl-9 pr-4 py-2 text-xs font-bold rounded-xl border outline-none focus:ring-1 focus:ring-sky-400 transition-all cursor-pointer relative ${
                         theme === 'light' 
                           ? 'bg-white border-slate-200 text-slate-800' 
-                          : 'bg-white/5 border-white/10 text-white'
-                      }`}
-                      placeholder="Enter assigned area"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Additional Extra Section - Stats badge */}
-              <div className={`p-3.5 rounded-2xl border flex items-center gap-3.5 ${
-                theme === 'light' 
-                  ? 'bg-gradient-to-r from-sky-50 to-blue-50 border-sky-100 shadow-sm' 
-                  : 'bg-gradient-to-r from-sky-950/25 to-blue-950/25 border-sky-500/10'
-              }`}>
-                <div className="p-2 bg-sky-500/15 rounded-xl text-sky-400">
-                  <Award className="w-6 h-6" />
-                </div>
-                <div>
-                  <h4 className="text-xs font-extrabold text-sky-400 uppercase tracking-widest">SLA Elite Status</h4>
-                  <p className={`text-[10px] mt-0.5 font-medium leading-relaxed ${
-                    theme === 'light' ? 'text-slate-600' : 'text-white/70'
-                  }`}>
-                    99.4% on-time dispatch rate. Ranked #1 in Dubai South elevator service efficiency.
-                  </p>
-                </div>
-              </div>
-
-              {/* Rate the App Feedback & Rating Card */}
-              <div className={`p-4 rounded-2xl border transition-all duration-300 ${
-                theme === 'light'
-                  ? 'bg-slate-50 border-slate-200 text-slate-800 shadow-sm'
-                  : 'bg-[#0f172a] border-sky-500/10 text-white shadow-sky-500/5'
-              }`}>
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-[10px] font-black uppercase text-sky-400 tracking-wider flex items-center gap-1">
-                    <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" /> Rate Taj Lift Portal
-                  </span>
-                  {isRatingSubmitted && (
-                    <span className="text-[8px] font-black uppercase bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded-full">
-                      Submitted
-                    </span>
-                  )}
-                </div>
-
-                {!isRatingSubmitted ? (
-                  <form onSubmit={handleRatingSubmit} className="space-y-3">
-                    <p className={`text-[10px] leading-relaxed ${theme === 'light' ? 'text-slate-600' : 'text-slate-400'}`}>
-                      How do you rate the dispatch tools, interactive routes, and offline financial controls?
-                    </p>
-
-                    {/* Interactive Stars Row */}
-                    <div className="flex items-center gap-2.5 justify-center py-1">
-                      {[1, 2, 3, 4, 5].map((star) => {
-                        const active = star <= (hoverRating || appRating);
-                        return (
-                          <button
-                            key={star}
-                            type="button"
-                            onMouseEnter={() => setHoverRating(star)}
-                            onMouseLeave={() => setHoverRating(0)}
-                            onClick={() => setAppRating(star)}
-                            className="focus:outline-none transform hover:scale-125 active:scale-95 transition-all cursor-pointer"
-                          >
-                            <Star 
-                              className={`w-6 h-6 transition-all duration-150 ${
-                                active 
-                                  ? 'text-amber-400 fill-amber-400 drop-shadow-[0_0_4px_rgba(251,191,36,0.4)]' 
-                                  : 'text-slate-400 opacity-40'
-                              }`} 
-                            />
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    {/* Feedback Text Area */}
-                    <textarea
-                      value={ratingFeedback}
-                      onChange={(e) => setRatingFeedback(e.target.value)}
-                      placeholder="Write your feedback... (e.g. Excellent speed, great offline sync)"
-                      maxLength={120}
-                      className={`w-full p-2.5 rounded-xl border text-[10px] outline-none resize-none h-12 transition-all ${
-                        theme === 'light'
-                          ? 'bg-white border-slate-200 text-slate-800 placeholder-slate-400 focus:border-sky-400'
-                          : 'bg-slate-950/40 border-white/10 text-white placeholder-white/30 focus:border-sky-500/50'
-                      }`}
-                    />
-
-                    <button
-                      type="submit"
-                      disabled={appRating === 0}
-                      className={`w-full py-2 rounded-xl text-[9px] uppercase font-black tracking-widest cursor-pointer transition-all ${
-                        appRating === 0
-                          ? 'bg-slate-300 dark:bg-slate-800 text-slate-400 dark:text-slate-600 cursor-not-allowed'
-                          : 'bg-sky-500 hover:bg-sky-600 text-white shadow-md shadow-sky-500/10'
+                          : 'bg-[#151c30] border-white/10 text-white'
                       }`}
                     >
-                      Submit Rating
-                    </button>
-                  </form>
-                ) : (
-                  <div className="text-center py-2 space-y-2">
-                    <div className="flex justify-center gap-1.5 py-1">
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <Star 
-                          key={star} 
-                          className={`w-5 h-5 ${star <= appRating ? 'text-amber-400 fill-amber-400' : 'text-slate-600 opacity-20'}`} 
-                        />
-                      ))}
-                    </div>
-                    <p className="text-[10px] font-bold text-emerald-500">Thank you for rating our app {appRating}/5!</p>
-                    {ratingFeedback && (
-                      <p className={`text-[9px] italic border-t border-white/5 pt-1.5 ${theme === 'light' ? 'text-slate-500' : 'text-slate-400'}`}>
-                        "{ratingFeedback}"
-                      </p>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => setIsRatingSubmitted(false)}
-                      className="text-[8px] text-sky-400 uppercase font-black hover:underline tracking-wide mt-1"
-                    >
-                      Change Rating
-                    </button>
+                      <option value="Dubai Marina & JBR" className={theme === 'light' ? 'text-slate-800' : 'bg-[#151c30] text-white'}>Dubai Marina & JBR</option>
+                      <option value="Dubai South & Jebel Ali" className={theme === 'light' ? 'text-slate-800' : 'bg-[#151c30] text-white'}>Dubai South & Jebel Ali</option>
+                      <option value="Downtown & Business Bay" className={theme === 'light' ? 'text-slate-800' : 'bg-[#151c30] text-white'}>Downtown & Business Bay</option>
+                      <option value="Pune & Maharashtra" className={theme === 'light' ? 'text-slate-800' : 'bg-[#151c30] text-white'}>Pune & Maharashtra</option>
+                    </select>
                   </div>
-                )}
+                </div>
               </div>
 
               {/* Legal & Regulatory Compliance Section */}
@@ -474,13 +504,52 @@ export default function SettingsModal() {
                 </div>
               </div>
 
+              {/* Database reset section */}
+              <div className={`p-4 rounded-2xl border ${
+                theme === 'light' 
+                  ? 'bg-red-50/50 border-red-100 shadow-sm' 
+                  : 'bg-red-950/10 border-red-500/10'
+              }`}>
+                <h3 className="text-[10px] font-black uppercase tracking-wider text-rose-500 mb-1.5 flex items-center gap-1.5">
+                  <Database className="w-3.5 h-3.5" /> Workspace Preparation (Client Slate)
+                </h3>
+                <p className={`text-[9.5px] leading-relaxed mb-3 ${theme === 'light' ? 'text-slate-600' : 'text-slate-400'}`}>
+                  Prepare this application for deployment to your client. This will completely purge all sample/mock data including projects, leads, service schedule slots, breakdown reports, payments, and followups. Your admin login credentials will remain intact.
+                </p>
+                
+                <button
+                  type="button"
+                  onClick={() => setShowPurgeConfirm(true)}
+                  disabled={isResetting || resetCompleted}
+                  className={`w-full py-2.5 px-4 rounded-xl text-xs font-black uppercase tracking-wider transition-all border flex items-center justify-center gap-2 cursor-pointer ${
+                    resetCompleted
+                      ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
+                      : 'bg-rose-500/10 hover:bg-rose-500/15 border-rose-500/20 text-rose-400'
+                  }`}
+                >
+                  {isResetting ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin text-rose-400" />
+                      <span>Resetting Database...</span>
+                    </>
+                  ) : resetCompleted ? (
+                    <>
+                      <CheckCircle className="w-4 h-4 text-emerald-400 animate-bounce" />
+                      <span>Purged Successfully! Reloading...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-4 h-4" />
+                      <span>Purge Sample Data & Start Fresh</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
               {/* Lock Session Button */}
               <button
                 type="button"
-                onClick={() => {
-                  lockSession();
-                  setIsSettingsOpen(false);
-                }}
+                onClick={handleLockSession}
                 className="w-full py-3 px-4 rounded-xl text-xs font-black uppercase tracking-wider text-sky-500 bg-sky-500/10 hover:bg-sky-500/15 transition-all border border-sky-500/20 flex items-center justify-center gap-2 cursor-pointer mt-4"
               >
                 <Shield className="w-4 h-4 text-sky-400 animate-pulse" />
@@ -490,10 +559,7 @@ export default function SettingsModal() {
               {/* Log Out Button */}
               <button
                 type="button"
-                onClick={() => {
-                  logout();
-                  setIsSettingsOpen(false);
-                }}
+                onClick={handleSignOut}
                 className="w-full py-3 px-4 rounded-xl text-xs font-black uppercase tracking-wider text-rose-500 bg-rose-500/10 hover:bg-rose-500/15 transition-all border border-rose-500/20 flex items-center justify-center gap-2 cursor-pointer mt-4"
               >
                 <LogOut className="w-4 h-4 animate-pulse" />
@@ -521,7 +587,7 @@ export default function SettingsModal() {
 
               <button
                 onClick={handleSave}
-                disabled={showSaveSuccess}
+                disabled={showSaveSuccess || !!loadingMessage}
                 className={`flex-[1.5] py-3 px-4 rounded-xl text-xs font-extrabold uppercase tracking-widest text-white transition-all bg-sky-500 shadow-lg shadow-sky-500/20 hover:bg-sky-600 cursor-pointer active:scale-98 flex items-center justify-center gap-1.5`}
               >
                 {showSaveSuccess ? (
@@ -534,6 +600,91 @@ export default function SettingsModal() {
                 )}
               </button>
             </div>
+
+            {/* Custom Purge Confirmation Overlay */}
+            <AnimatePresence>
+              {showPurgeConfirm && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="absolute inset-0 bg-slate-950/90 backdrop-blur-sm z-[99999] flex flex-col items-center justify-center p-6"
+                >
+                  <div className={`p-6 rounded-3xl border w-full max-w-xs text-center space-y-4 shadow-2xl ${
+                    theme === 'light' 
+                      ? 'bg-white border-slate-200 text-slate-800' 
+                      : 'bg-[#131929] border-rose-500/20 text-white'
+                  }`}>
+                    <div className="w-12 h-12 rounded-full bg-rose-500/10 text-rose-500 flex items-center justify-center mx-auto animate-bounce">
+                      <Trash2 className="w-6 h-6" />
+                    </div>
+                    
+                    <div>
+                      <h4 className="text-sm font-black uppercase tracking-wider text-rose-500">
+                        System Purge Required?
+                      </h4>
+                      <p className={`text-[10px] font-semibold leading-relaxed mt-2 ${
+                        theme === 'light' ? 'text-slate-600' : 'text-slate-400'
+                      }`}>
+                        Are you absolutely sure you want to permanently delete all sample/mock projects, leads, breakdowns, schedule slots, payments, and followups from the live database?
+                      </p>
+                      <p className="text-[9.5px] font-bold text-rose-400 mt-1 leading-normal italic">
+                        This action is irreversible and prepares the workspace as a pristine clean slate for your client.
+                      </p>
+                    </div>
+                    
+                    <div className="flex gap-2.5 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => setShowPurgeConfirm(false)}
+                        className={`flex-1 py-2.5 px-4 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                          theme === 'light'
+                            ? 'bg-slate-200 hover:bg-slate-300 text-slate-700'
+                            : 'bg-white/5 hover:bg-white/10 text-white/80'
+                        }`}
+                      >
+                        Cancel
+                      </button>
+                      
+                      <button
+                        type="button"
+                        onClick={handleResetDatabase}
+                        className="flex-1 py-2.5 px-4 rounded-xl text-xs font-black uppercase tracking-wider bg-rose-500 hover:bg-rose-600 text-white shadow-lg shadow-rose-500/20 transition-all cursor-pointer"
+                      >
+                        Purge Now
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Global Loading Overlay Screen */}
+            <AnimatePresence>
+              {loadingMessage && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="absolute inset-0 bg-slate-950/80 backdrop-blur-md z-[100000] flex flex-col items-center justify-center p-6 text-center select-none"
+                >
+                  <div className="relative mb-6">
+                    {/* Outer glowing pulse ring */}
+                    <div className="absolute inset-x-0 top-0 bottom-0 rounded-full bg-sky-500/10 blur-xl animate-pulse" />
+                    {/* Spinner */}
+                    <RefreshCw className="w-12 h-12 text-sky-400 animate-spin relative z-10" />
+                  </div>
+                  
+                  <h3 className="text-sm font-black uppercase tracking-widest text-sky-400 mb-2">
+                    Processing Request
+                  </h3>
+                  
+                  <p className="text-xs font-medium text-slate-300 max-w-xs leading-relaxed animate-pulse">
+                    {loadingMessage}
+                  </p>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </motion.div>
 
           <LegalModal

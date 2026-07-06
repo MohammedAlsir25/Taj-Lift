@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { getFirestore, enableIndexedDbPersistence } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAdku2nLF8TmunJF83wresfvZmTQdLeijI",
@@ -20,5 +20,12 @@ const auth = getAuth(app);
 // Initialize Firestore with specific custom database ID
 const dbId = "ai-studio-tajliftmanagemen-d5205c36-0a1b-427c-bb44-ea1b2a359e3b";
 const db = getFirestore(app, dbId);
+
+// Enable IndexedDb Persistence immediately to avoid "Firestore has already been started"
+enableIndexedDbPersistence(db).catch((e) => {
+  if (e.code !== "failed-precondition") {
+    console.warn("Firestore persistence could not be enabled:", e);
+  }
+});
 
 export { app, auth, db };

@@ -3,7 +3,7 @@ import {
   ArrowLeft, Clock, Calendar, AlertTriangle, Play, CheckCircle, ChevronRight, 
   Calculator, Download, ExternalLink, Mail, Phone, Globe, CreditCard, 
   FileCheck, DollarSign, Activity, FileText, CheckCircle2, Search, Filter, 
-  TrendingUp, RefreshCw, Building, Layers, Send, User, ShieldCheck, Check
+  TrendingUp, RefreshCw, Building, Layers, Send, User, ShieldCheck, Check, Sparkles
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import StatusBadge from '../components/StatusBadge';
@@ -26,10 +26,14 @@ interface PaymentEntry {
 export default function ProjectTracker() {
   const navigate = useNavigate();
   const [activeSubTab, setActiveSubTab] = useState<'gantt' | 'estimation' | 'payments' | 'repair' | 'mis' | 'strategy'>('gantt');
-  const { theme } = useProfile();
+  const { theme, phone } = useProfile();
   const { projects } = useProjects();
   const activeProject = projects[0];
   const isLight = theme === 'light';
+
+  // Clean phone number to keep only digits for the wa.me link
+  const cleanPhone = phone ? phone.replace(/\D/g, '') : '';
+  const whatsappUrl = cleanPhone ? `https://wa.me/${cleanPhone}` : 'https://wa.me/918883832222';
 
   const [trackerAlert, setTrackerAlert] = useState<string | null>(null);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
@@ -891,6 +895,8 @@ export default function ProjectTracker() {
               </div>
             )}
 
+
+
             {/* 6. STRATEGY CALL SUB-TAB */}
             {activeSubTab === 'strategy' && (
               <div className="space-y-4">
@@ -907,7 +913,7 @@ export default function ProjectTracker() {
                       Book Product Strategy Call
                     </h4>
                     <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-500' : 'text-white/70'}`}>
-                      Need a complete workflow audit? Scan this QR code or trigger below to request a live, dedicated setup demonstration.
+                      Need a complete workflow audit? Scan this QR code or click below to start a conversation directly on WhatsApp.
                     </p>
                   </div>
 
@@ -923,50 +929,65 @@ export default function ProjectTracker() {
                     {/* Continuous horizontal pulsing scanning laser beam */}
                     <div className="absolute left-1 right-1 h-0.5 bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)] z-10 animate-[bounce_3s_infinite_ease-in-out]" />
 
-                    {/* QR Code Container */}
-                    <div className={`w-full h-full p-2.5 rounded-xl shadow-inner border flex items-center justify-center transition-colors ${
-                      isLight ? 'bg-slate-50 border-slate-200' : 'bg-white border-white/10'
-                    }`}>
-                      <svg viewBox="0 0 100 100" className="w-full h-full text-slate-900" fill="currentColor">
-                        {/* Elegant QR matrix representation */}
-                        <rect x="0" y="0" width="25" height="25" />
-                        <rect x="5" y="5" width="15" height="15" fill="white" />
-                        <rect x="8" y="8" width="9" height="9" />
+                    {/* QR Code Container as an anchor tag linking to WhatsApp */}
+                    <a
+                      href={whatsappUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      title="Click to chat on WhatsApp"
+                      className={`w-full h-full p-2.5 rounded-xl shadow-inner border flex items-center justify-center transition-all duration-300 hover:scale-[1.03] ${
+                        isLight ? 'bg-slate-50 border-slate-200' : 'bg-white border-white/10'
+                      }`}
+                    >
+                      {cleanPhone ? (
+                        <img 
+                          src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(whatsappUrl)}`} 
+                          alt="WhatsApp QR Code"
+                          className="w-full h-full object-contain"
+                          referrerPolicy="no-referrer"
+                        />
+                      ) : (
+                        <svg viewBox="0 0 100 100" className="w-full h-full text-slate-900" fill="currentColor">
+                          {/* Elegant QR matrix representation fallback */}
+                          <rect x="0" y="0" width="25" height="25" />
+                          <rect x="5" y="5" width="15" height="15" fill="white" />
+                          <rect x="8" y="8" width="9" height="9" />
 
-                        <rect x="75" y="0" width="25" height="25" />
-                        <rect x="80" y="5" width="15" height="15" fill="white" />
-                        <rect x="83" y="8" width="9" height="9" />
+                          <rect x="75" y="0" width="25" height="25" />
+                          <rect x="80" y="5" width="15" height="15" fill="white" />
+                          <rect x="83" y="8" width="9" height="9" />
 
-                        <rect x="0" y="75" width="25" height="25" />
-                        <rect x="5" y="80" width="15" height="15" fill="white" />
-                        <rect x="8" y="83" width="9" height="9" />
+                          <rect x="0" y="75" width="25" height="25" />
+                          <rect x="5" y="80" width="15" height="15" fill="white" />
+                          <rect x="8" y="83" width="9" height="9" />
 
-                        <rect x="35" y="35" width="30" height="30" />
-                        <rect x="40" y="40" width="20" height="20" fill="white" />
+                          <rect x="35" y="35" width="30" height="30" />
+                          <rect x="40" y="40" width="20" height="20" fill="white" />
 
-                        {/* Custom digital dots */}
-                        <rect x="35" y="10" width="5" height="10" />
-                        <rect x="45" y="5" width="10" height="5" />
-                        <rect x="60" y="15" width="5" height="15" />
-                        <rect x="10" y="35" width="15" height="5" />
-                        <rect x="15" y="45" width="5" height="10" />
-                        <rect x="35" y="75" width="15" height="5" />
-                        <rect x="45" y="85" width="15" height="10" />
-                        <rect x="75" y="35" width="10" height="15" />
-                        <rect x="85" y="45" width="10" height="10" />
-                        <rect x="75" y="75" width="20" height="5" />
-                      </svg>
-                    </div>
+                          {/* Custom digital dots */}
+                          <rect x="35" y="10" width="5" height="10" />
+                          <rect x="45" y="5" width="10" height="5" />
+                          <rect x="60" y="15" width="5" height="15" />
+                          <rect x="10" y="35" width="15" height="5" />
+                          <rect x="15" y="45" width="5" height="10" />
+                          <rect x="35" y="75" width="15" height="5" />
+                          <rect x="45" y="85" width="15" height="10" />
+                          <rect x="75" y="35" width="10" height="15" />
+                          <rect x="85" y="45" width="10" height="10" />
+                          <rect x="75" y="75" width="20" height="5" />
+                        </svg>
+                      )}
+                    </a>
                   </div>
 
                   <div className="space-y-2">
                     <a
-                      href="https://elevatorplus.app/demo-request"
+                      href={whatsappUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="inline-flex items-center gap-1.5 text-xs text-sky-500 dark:text-sky-400 font-extrabold hover:underline"
+                      className="inline-flex items-center gap-1.5 text-xs text-emerald-500 dark:text-emerald-400 font-extrabold hover:underline"
                     >
-                      <span>elevatorplus.app/demo-request</span>
+                      <span>Chat on WhatsApp: {phone || '+91 88838 32222'}</span>
                       <ExternalLink className="w-3.5 h-3.5" />
                     </a>
                   </div>

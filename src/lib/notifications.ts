@@ -1,55 +1,27 @@
-import { Capacitor } from '@capacitor/core';
-import { PushNotifications, PushNotificationSchema, ActionPerformed } from '@capacitor/push-notifications';
-import { getAuth } from 'firebase/auth';
-
-const isNative = Capacitor.isNativePlatform();
-const SERVER_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-
-async function getAuthToken(): Promise<string | null> {
-  const user = getAuth().currentUser;
-  if (!user) return null;
-  try { return await user.getIdToken(); } catch { return null; }
-}
-
+/**
+ * Registers push notifications or requests permission if available.
+ */
 export async function registerPushNotifications(): Promise<void> {
-  if (!isNative) return;
-
-  let permStatus = await PushNotifications.checkPermissions();
-  if (permStatus.receive === 'prompt') {
-    permStatus = await PushNotifications.requestPermissions();
+  if (!('Notification' in window)) {
+    console.log('[Notifications] This browser does not support desktop push notifications.');
+    return;
   }
-  if (permStatus.receive !== 'granted') return;
 
-  await PushNotifications.register();
-
-  PushNotifications.addListener('registration', async (token) => {
-    const idToken = await getAuthToken();
-    if (!idToken) return;
-    try {
-      await fetch(`${SERVER_URL}/api/notifications/register-token`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
-        body: JSON.stringify({ fcmToken: token.value }),
-      });
-    } catch (e) {
-      console.warn('Failed to register FCM token:', e);
+  try {
+    if (Notification.permission === 'granted') {
+      console.log('[Notifications] Permission already granted.');
+      return;
     }
-  });
 
-  PushNotifications.addListener('registrationError', (err) => {
-    console.warn('FCM registration error:', err.error);
-  });
-
-  PushNotifications.addListener('pushNotificationReceived', (notification: PushNotificationSchema) => {
-    if (notification.body) {
-      alert(`${notification.title}: ${notification.body}`);
+    if (Notification.permission !== 'denied') {
+      const permission = await Notification.requestPermission();
+      if (permission === 'granted') {
+        console.log('[Notifications] Permission granted successfully.');
+      } else {
+        console.log('[Notifications] Permission was dismissed or denied.');
+      }
     }
-  });
-
-  PushNotifications.addListener('pushNotificationActionPerformed', (action: ActionPerformed) => {
-    const data = action.notification.data;
-    if (data?.route) {
-      window.location.hash = data.route as string;
-    }
-  });
+  } catch (err) {
+    console.error('[Notifications] Error requesting push notification permission:', err);
+  }
 }

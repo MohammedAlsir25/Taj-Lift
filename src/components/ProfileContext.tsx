@@ -13,29 +13,14 @@ export interface AvatarPreset {
 
 export const AVATAR_PRESETS: AvatarPreset[] = [
   {
-    id: 'avatar-1',
-    url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80',
-    label: 'Sarah (Admin)'
+    id: 'male',
+    url: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none"><circle cx="50" cy="50" r="50" fill="%23bae6fd"/><circle cx="50" cy="40" r="18" fill="%230284c7"/><path d="M50 64c-16 0-30 8-34 20a50 50 0 0068 0c-4-12-18-20-34-20z" fill="%230284c7"/></svg>',
+    label: 'Male'
   },
   {
-    id: 'avatar-2',
-    url: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&auto=format&fit=crop&q=80',
-    label: 'Alex (Lead Tech)'
-  },
-  {
-    id: 'avatar-3',
-    url: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=120&auto=format&fit=crop&q=80',
-    label: 'John (Supervisor)'
-  },
-  {
-    id: 'avatar-4',
-    url: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=120&auto=format&fit=crop&q=80',
-    label: 'Elena (Director)'
-  },
-  {
-    id: 'avatar-5',
-    url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&auto=format&fit=crop&q=80',
-    label: 'Marcus (Tech II)'
+    id: 'female',
+    url: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none"><circle cx="50" cy="50" r="50" fill="%23fbcfe8"/><circle cx="50" cy="42" r="16" fill="%23db2777"/><path d="M50 64c-16 0-30 8-34 20a50 50 0 0068 0c-4-12-18-20-34-20z" fill="%23db2777"/><path d="M50 22c-10 0-18 6-18 16 0 4 1 8 3 10 2-4 5-8 15-8s13 4 15 8c2-2 3-6 3-10 0-10-8-16-18-16z" fill="%23db2777"/></svg>',
+    label: 'Female'
   }
 ];
 

@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useProfile, AVATAR_PRESETS } from '../components/ProfileContext';
-import { Mail, Lock, User, Phone, MapPin, Briefcase, Eye, EyeOff, ShieldAlert, CheckCircle, ArrowRight } from 'lucide-react';
+import { Mail, Lock, User, Phone, MapPin, Briefcase, Eye, EyeOff, ShieldAlert, CheckCircle, ArrowRight, Camera } from 'lucide-react';
 import TajLogo from '../components/TajLogo';
 import LegalModal from '../components/LegalModal';
 
@@ -16,7 +16,22 @@ export default function SignUp() {
   const [phone, setPhone] = useState('');
   const [region, setRegion] = useState('Dubai South & Jebel Ali');
   const [role, setRole] = useState('Field Technician');
-  const [selectedAvatar, setSelectedAvatar] = useState(AVATAR_PRESETS[1].url);
+  const [selectedAvatar, setSelectedAvatar] = useState(AVATAR_PRESETS[0].url);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (typeof reader.result === 'string') {
+          setSelectedAvatar(reader.result);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
@@ -98,9 +113,9 @@ export default function SignUp() {
         <form onSubmit={handleSubmit} className="space-y-2.5 overflow-y-auto no-scrollbar max-h-[350px] pr-0.5">
           <div className="space-y-1">
             <span className="text-[8px] font-black uppercase tracking-wider block opacity-75">
-              Choose Avatar Profile Pic
+              Choose Avatar / Upload Pic
             </span>
-            <div className="flex items-center gap-2 justify-center py-1">
+            <div className="flex items-center gap-2.5 justify-center py-1">
               {AVATAR_PRESETS.map((preset) => (
                 <button
                   key={preset.id}
@@ -120,6 +135,34 @@ export default function SignUp() {
                   />
                 </button>
               ))}
+              <input
+                type="file"
+                accept="image/*"
+                ref={fileInputRef}
+                onChange={handleFileChange}
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className={`relative rounded-full w-9 h-9 flex items-center justify-center border border-dashed transition-all cursor-pointer hover:border-sky-400 hover:text-sky-400 ${
+                  !AVATAR_PRESETS.some(p => p.url === selectedAvatar)
+                    ? 'ring-2 ring-sky-400 scale-105 shadow-md border-sky-400 text-sky-400'
+                    : 'opacity-60 hover:opacity-100 text-slate-400 border-slate-300'
+                }`}
+                title="Upload custom image"
+              >
+                {(!AVATAR_PRESETS.some(p => p.url === selectedAvatar) && selectedAvatar.startsWith('data:image/')) ? (
+                  <img
+                    src={selectedAvatar}
+                    alt="Custom Upload"
+                    className="w-full h-full rounded-full object-cover"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <Camera className="w-4 h-4" />
+                )}
+              </button>
             </div>
           </div>
 

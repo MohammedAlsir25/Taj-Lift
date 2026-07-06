@@ -11,13 +11,13 @@ import TechnicianMap from './pages/TechnicianMap';
 import ProjectFinance from './pages/ProjectFinance';
 import SignIn from './pages/SignIn';
 import SignUp from './pages/SignUp';
+import ClientProposalDeck from './pages/ClientProposalDeck';
 import { ProfileProvider, useProfile } from './components/ProfileContext';
 import { ProjectProvider } from './components/ProjectContext';
 import SettingsModal from './components/SettingsModal';
 import BiometricGate from './components/BiometricGate';
 import { initDatabase, flushPendingWrites } from './lib/sync';
 import { registerPushNotifications } from './lib/notifications';
-import { enableIndexedDbPersistence } from 'firebase/firestore';
 import { db } from './lib/firebase';
 
 function LoadingScreen() {
@@ -115,6 +115,12 @@ function AnimatedRoutes() {
             </PageWrapper>
           }
         />
+        <Route
+          path="/proposal"
+          element={
+            <ClientProposalDeck />
+          }
+        />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </AnimatePresence>
@@ -144,9 +150,6 @@ function AppContent() {
   const [online, setOnline] = useState(navigator.onLine);
 
   useEffect(() => {
-    enableIndexedDbPersistence(db).catch(e => {
-      if (e.code !== 'failed-precondition') console.warn('Firestore persistence:', e);
-    });
     initDatabase().then(() => flushPendingWrites());
   }, []);
 
@@ -164,6 +167,10 @@ function AppContent() {
 
   if (authLoading) {
     return <LoadingScreen />;
+  }
+
+  if (location.pathname === '/proposal') {
+    return <AnimatedRoutes />;
   }
 
   return (

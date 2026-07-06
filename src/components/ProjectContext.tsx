@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { collection, onSnapshot, doc, setDoc } from "firebase/firestore";
 import { db } from "../lib/firebase";
+import { useProfile } from "./ProfileContext";
 
 export interface Expense {
   id: string;
@@ -33,8 +34,14 @@ const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
 
 export function ProjectProvider({ children }: { children: React.ReactNode }) {
   const [projects, setProjects] = useState<Project[]>([]);
+  const { currentUser } = useProfile();
 
   useEffect(() => {
+    if (!currentUser) {
+      setProjects([]);
+      return;
+    }
+
     const unsubscribe = onSnapshot(collection(db, "projects"), (snapshot) => {
       const list: Project[] = [];
       snapshot.forEach((doc) => {
@@ -45,7 +52,7 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
       console.error("Firestore onSnapshot projects error:", error);
     });
     return () => unsubscribe();
-  }, []);
+  }, [currentUser]);
 
   const addProject = (name: string, location: string, budget: number): Project => {
     const cityCode = location.substring(0, 3).toUpperCase();

@@ -104,15 +104,15 @@ Formatting Guidelines:
         
         content += `### Project ID: ${proj.id} - ${proj.name}\n`;
         content += `- Location: ${proj.location}\n`;
-        content += `- Total Budget: ₹${proj.budget.toLocaleString()}\n`;
-        content += `- Total Spent: ₹${totalSpent.toLocaleString()} (${spentPercent}% of budget)\n`;
+        content += `- Total Budget: AED ${proj.budget.toLocaleString()}\n`;
+        content += `- Total Spent: AED ${totalSpent.toLocaleString()} (${spentPercent}% of budget)\n`;
         content += `- Completion Stage: ${proj.completed}%\n`;
         content += `- Status: ${proj.status}\n`;
         
         if (proj.expenses && proj.expenses.length > 0) {
           content += `- Logged Expenses:\n`;
           proj.expenses.forEach((exp: any) => {
-            content += `  * ${exp.title} [Category: ${exp.category}]: ₹${exp.amount.toLocaleString()} on ${exp.date}\n`;
+            content += `  * ${exp.title} [Category: ${exp.category}]: AED ${exp.amount.toLocaleString()} on ${exp.date}\n`;
           });
         } else {
           content += `- Logged Expenses: None\n`;

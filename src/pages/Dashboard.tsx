@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { ArrowUpRight, TrendingUp, ShieldAlert, CheckCircle2, ChevronRight, BarChart3, AlertCircle, Sparkles, DollarSign } from 'lucide-react';
+import { ArrowUpRight, TrendingUp, ShieldAlert, CheckCircle2, ChevronRight, BarChart3, AlertCircle, Sparkles, DollarSign, MapPin } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import StatusBadge from '../components/StatusBadge';
 import TajLogo from '../components/TajLogo';
@@ -13,7 +13,7 @@ import { db } from '../lib/firebase';
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const [filterMode, setFilterMode] = useState<'track' | 'analyze' | 'overview'>('analyze');
+  const [filterMode, setFilterMode] = useState<'track' | 'analyze' | 'overview'>('overview');
   const [expandedCard, setExpandedCard] = useState<string | null>(null);
   const { profilePic, name, role, isAvailable, theme, setIsSettingsOpen } = useProfile();
   const isLight = theme === 'light';
@@ -55,6 +55,12 @@ export default function Dashboard() {
     });
     return () => { unsubLeads(); unsubPm(); unsubBd(); };
   }, []);
+
+  useEffect(() => {
+    if (projects.length > 0 && !dashSelectedProj) {
+      setDashSelectedProj(projects[0].id);
+    }
+  }, [projects, dashSelectedProj]);
 
   const handleDashCreateProj = (e: React.FormEvent) => {
     e.preventDefault();
@@ -245,200 +251,208 @@ export default function Dashboard() {
         <div className="grid grid-cols-2 gap-3">
           
           {/* Card 1: Enquiries */}
-          <button
-            onClick={() => setExpandedCard(expandedCard === 'enquiries' ? null : 'enquiries')}
-            className={`rounded-2xl p-3.5 border text-left shadow-lg relative overflow-hidden flex flex-col justify-between h-[160px] transition-all cursor-pointer ${
-              isLight
-                ? 'bg-white border-slate-200/80 text-slate-800'
-                : 'bg-white/10 backdrop-blur-md border-white/10 text-white'
-            } ${
-              expandedCard === 'enquiries' 
-                ? `ring-2 ring-sky-400 ${isLight ? 'bg-sky-50/50' : 'bg-white/15'}` 
-                : isLight ? 'hover:bg-slate-50' : 'hover:bg-white/15'
-            }`}
-          >
-            <div className="flex justify-between items-start w-full">
-              <div>
-                <p className={`text-[10px] font-extrabold uppercase tracking-wider ${isLight ? 'text-slate-400' : 'text-white/40'}`}>Enquiries</p>
-                <h3 className={`text-xl font-black mt-0.5 ${isLight ? 'text-slate-900' : 'text-white'}`}>{enquiriesStats.total}</h3>
+          {(filterMode === 'overview' || filterMode === 'analyze') && (
+            <button
+              onClick={() => setExpandedCard(expandedCard === 'enquiries' ? null : 'enquiries')}
+              className={`rounded-2xl p-3.5 border text-left shadow-lg relative overflow-hidden flex flex-col justify-between h-[160px] transition-all cursor-pointer ${
+                isLight
+                  ? 'bg-white border-slate-200/80 text-slate-800'
+                  : 'bg-white/10 backdrop-blur-md border-white/10 text-white'
+              } ${
+                expandedCard === 'enquiries' 
+                  ? `ring-2 ring-sky-400 ${isLight ? 'bg-sky-50/50' : 'bg-white/15'}` 
+                  : isLight ? 'hover:bg-slate-50' : 'hover:bg-white/15'
+              }`}
+            >
+              <div className="flex justify-between items-start w-full">
+                <div>
+                  <p className={`text-[10px] font-extrabold uppercase tracking-wider ${isLight ? 'text-slate-400' : 'text-white/40'}`}>Enquiries</p>
+                  <h3 className={`text-xl font-black mt-0.5 ${isLight ? 'text-slate-900' : 'text-white'}`}>{enquiriesStats.total}</h3>
+                </div>
+                <span className="bg-sky-500/20 text-sky-500 dark:text-sky-300 text-[8px] font-bold px-1.5 py-0.5 rounded uppercase">
+                  CRM
+                </span>
               </div>
-              <span className="bg-sky-500/20 text-sky-500 dark:text-sky-300 text-[8px] font-bold px-1.5 py-0.5 rounded uppercase">
-                CRM
-              </span>
-            </div>
 
-            <div className="flex items-center justify-center py-1.5 relative w-full">
-              <svg className="w-14 h-14 transform -rotate-90">
-                <circle cx="28" cy="28" r="22" className={`fill-none ${isLight ? 'stroke-slate-100' : 'stroke-white/10'}`} strokeWidth="4" />
-                <circle
-                  cx="28"
-                  cy="28"
-                  r="22"
-                  className="stroke-sky-400 fill-none transition-all duration-1000"
-                  strokeWidth="4"
-                  strokeDasharray={2 * Math.PI * 22}
-                  strokeDashoffset={2 * Math.PI * 22 * (1 - enquiriesStats.percentage / 100)}
-                  strokeLinecap="round"
-                />
-              </svg>
-              <div className="absolute inset-0 flex items-center justify-center flex-col">
-                <span className={`text-[10px] font-black ${isLight ? 'text-slate-800' : 'text-white'}`}>{enquiriesStats.percentage}%</span>
-                <span className={`text-[7px] font-bold uppercase ${isLight ? 'text-slate-400' : 'text-white/50'}`}>Won</span>
+              <div className="flex items-center justify-center py-1.5 relative w-full">
+                <svg className="w-14 h-14 transform -rotate-90">
+                  <circle cx="28" cy="28" r="22" className={`fill-none ${isLight ? 'stroke-slate-100' : 'stroke-white/10'}`} strokeWidth="4" />
+                  <circle
+                    cx="28"
+                    cy="28"
+                    r="22"
+                    className="stroke-sky-400 fill-none transition-all duration-1000"
+                    strokeWidth="4"
+                    strokeDasharray={2 * Math.PI * 22}
+                    strokeDashoffset={2 * Math.PI * 22 * (1 - enquiriesStats.percentage / 100)}
+                    strokeLinecap="round"
+                  />
+                </svg>
+                <div className="absolute inset-0 flex items-center justify-center flex-col">
+                  <span className={`text-[10px] font-black ${isLight ? 'text-slate-800' : 'text-white'}`}>{enquiriesStats.percentage}%</span>
+                  <span className={`text-[7px] font-bold uppercase ${isLight ? 'text-slate-400' : 'text-white/50'}`}>Won</span>
+                </div>
               </div>
-            </div>
 
-            <div className={`flex items-center justify-between w-full text-[8px] border-t pt-1 ${isLight ? 'text-slate-500 border-slate-100' : 'text-white/60 border-white/5'}`}>
-              <span>{enquiriesStats.categories[1].value} Finalized</span>
-              <ChevronRight className={`w-2.5 h-2.5 ${isLight ? 'text-slate-300' : 'text-white/40'}`} />
-            </div>
-          </button>
+              <div className={`flex items-center justify-between w-full text-[8px] border-t pt-1 ${isLight ? 'text-slate-500 border-slate-100' : 'text-white/60 border-white/5'}`}>
+                <span>{enquiriesStats.categories[1].value} Finalized</span>
+                <ChevronRight className={`w-2.5 h-2.5 ${isLight ? 'text-slate-300' : 'text-white/40'}`} />
+              </div>
+            </button>
+          )}
 
           {/* Card 2: Jobs */}
-          <button
-            onClick={() => setExpandedCard(expandedCard === 'jobs' ? null : 'jobs')}
-            className={`rounded-2xl p-3.5 border text-left shadow-lg relative overflow-hidden flex flex-col justify-between h-[160px] transition-all cursor-pointer ${
-              isLight
-                ? 'bg-white border-slate-200/80 text-slate-800'
-                : 'bg-white/10 backdrop-blur-md border-white/10 text-white'
-            } ${
-              expandedCard === 'jobs' 
-                ? `ring-2 ring-emerald-400 ${isLight ? 'bg-emerald-50/50' : 'bg-white/15'}` 
-                : isLight ? 'hover:bg-slate-50' : 'hover:bg-white/15'
-            }`}
-          >
-            <div className="flex justify-between items-start w-full">
-              <div>
-                <p className={`text-[10px] font-extrabold uppercase tracking-wider ${isLight ? 'text-slate-400' : 'text-white/40'}`}>Jobs</p>
-                <h3 className={`text-xl font-black mt-0.5 ${isLight ? 'text-slate-900' : 'text-white'}`}>{jobsStats.total}</h3>
+          {(filterMode === 'overview' || filterMode === 'analyze') && (
+            <button
+              onClick={() => setExpandedCard(expandedCard === 'jobs' ? null : 'jobs')}
+              className={`rounded-2xl p-3.5 border text-left shadow-lg relative overflow-hidden flex flex-col justify-between h-[160px] transition-all cursor-pointer ${
+                isLight
+                  ? 'bg-white border-slate-200/80 text-slate-800'
+                  : 'bg-white/10 backdrop-blur-md border-white/10 text-white'
+              } ${
+                expandedCard === 'jobs' 
+                  ? `ring-2 ring-emerald-400 ${isLight ? 'bg-emerald-50/50' : 'bg-white/15'}` 
+                  : isLight ? 'hover:bg-slate-50' : 'hover:bg-white/15'
+              }`}
+            >
+              <div className="flex justify-between items-start w-full">
+                <div>
+                  <p className={`text-[10px] font-extrabold uppercase tracking-wider ${isLight ? 'text-slate-400' : 'text-white/40'}`}>Jobs</p>
+                  <h3 className={`text-xl font-black mt-0.5 ${isLight ? 'text-slate-900' : 'text-white'}`}>{jobsStats.total}</h3>
+                </div>
+                <span className="bg-emerald-500/20 text-emerald-500 dark:text-emerald-300 text-[8px] font-bold px-1.5 py-0.5 rounded uppercase">
+                  Active
+                </span>
               </div>
-              <span className="bg-emerald-500/20 text-emerald-500 dark:text-emerald-300 text-[8px] font-bold px-1.5 py-0.5 rounded uppercase">
-                Active
-              </span>
-            </div>
 
-            <div className="flex items-center justify-center py-1.5 relative w-full">
-              <svg className="w-14 h-14 transform -rotate-90">
-                <circle cx="28" cy="28" r="22" className={`fill-none ${isLight ? 'stroke-slate-100' : 'stroke-white/10'}`} strokeWidth="4" />
-                <circle
-                  cx="28"
-                  cy="28"
-                  r="22"
-                  className="stroke-emerald-400 fill-none transition-all duration-1000"
-                  strokeWidth="4"
-                  strokeDasharray={2 * Math.PI * 22}
-                  strokeDashoffset={2 * Math.PI * 22 * (1 - jobsStats.percentage / 100)}
-                  strokeLinecap="round"
-                />
-              </svg>
-              <div className="absolute inset-0 flex items-center justify-center flex-col">
-                <span className={`text-[10px] font-black ${isLight ? 'text-slate-800' : 'text-white'}`}>{jobsStats.percentage}%</span>
-                <span className={`text-[7px] font-bold uppercase ${isLight ? 'text-slate-400' : 'text-white/50'}`}>Done</span>
+              <div className="flex items-center justify-center py-1.5 relative w-full">
+                <svg className="w-14 h-14 transform -rotate-90">
+                  <circle cx="28" cy="28" r="22" className={`fill-none ${isLight ? 'stroke-slate-100' : 'stroke-white/10'}`} strokeWidth="4" />
+                  <circle
+                    cx="28"
+                    cy="28"
+                    r="22"
+                    className="stroke-emerald-400 fill-none transition-all duration-1000"
+                    strokeWidth="4"
+                    strokeDasharray={2 * Math.PI * 22}
+                    strokeDashoffset={2 * Math.PI * 22 * (1 - jobsStats.percentage / 100)}
+                    strokeLinecap="round"
+                  />
+                </svg>
+                <div className="absolute inset-0 flex items-center justify-center flex-col">
+                  <span className={`text-[10px] font-black ${isLight ? 'text-slate-800' : 'text-white'}`}>{jobsStats.percentage}%</span>
+                  <span className={`text-[7px] font-bold uppercase ${isLight ? 'text-slate-400' : 'text-white/50'}`}>Done</span>
+                </div>
               </div>
-            </div>
 
-            <div className={`flex items-center justify-between w-full text-[8px] border-t pt-1 ${isLight ? 'text-slate-500 border-slate-100' : 'text-white/60 border-white/5'}`}>
-              <span>{jobsStats.categories[2].value} Completed</span>
-              <ChevronRight className={`w-2.5 h-2.5 ${isLight ? 'text-slate-300' : 'text-white/40'}`} />
-            </div>
-          </button>
+              <div className={`flex items-center justify-between w-full text-[8px] border-t pt-1 ${isLight ? 'text-slate-500 border-slate-100' : 'text-white/60 border-white/5'}`}>
+                <span>{jobsStats.categories[2].value} Completed</span>
+                <ChevronRight className={`w-2.5 h-2.5 ${isLight ? 'text-slate-300' : 'text-white/40'}`} />
+              </div>
+            </button>
+          )}
 
           {/* Card 3: PM / AMC */}
-          <button
-            onClick={() => setExpandedCard(expandedCard === 'pm' ? null : 'pm')}
-            className={`rounded-2xl p-3.5 border text-left shadow-lg relative overflow-hidden flex flex-col justify-between h-[160px] transition-all cursor-pointer ${
-              isLight
-                ? 'bg-white border-slate-200/80 text-slate-800'
-                : 'bg-white/10 backdrop-blur-md border-white/10 text-white'
-            } ${
-              expandedCard === 'pm' 
-                ? `ring-2 ring-amber-400 ${isLight ? 'bg-amber-50/50' : 'bg-white/15'}` 
-                : isLight ? 'hover:bg-slate-50' : 'hover:bg-white/15'
-            }`}
-          >
-            <div className="flex justify-between items-start w-full">
-              <div>
-                <p className={`text-[10px] font-extrabold uppercase tracking-wider ${isLight ? 'text-slate-400' : 'text-white/40'}`}>PM / AMC</p>
-                <h3 className={`text-xl font-black mt-0.5 ${isLight ? 'text-slate-900' : 'text-white'}`}>{pmStats.total}</h3>
+          {(filterMode === 'overview' || filterMode === 'track') && (
+            <button
+              onClick={() => setExpandedCard(expandedCard === 'pm' ? null : 'pm')}
+              className={`rounded-2xl p-3.5 border text-left shadow-lg relative overflow-hidden flex flex-col justify-between h-[160px] transition-all cursor-pointer ${
+                isLight
+                  ? 'bg-white border-slate-200/80 text-slate-800'
+                  : 'bg-white/10 backdrop-blur-md border-white/10 text-white'
+              } ${
+                expandedCard === 'pm' 
+                  ? `ring-2 ring-amber-400 ${isLight ? 'bg-amber-50/50' : 'bg-white/15'}` 
+                  : isLight ? 'hover:bg-slate-50' : 'hover:bg-white/15'
+              }`}
+            >
+              <div className="flex justify-between items-start w-full">
+                <div>
+                  <p className={`text-[10px] font-extrabold uppercase tracking-wider ${isLight ? 'text-slate-400' : 'text-white/40'}`}>PM / AMC</p>
+                  <h3 className={`text-xl font-black mt-0.5 ${isLight ? 'text-slate-900' : 'text-white'}`}>{pmStats.total}</h3>
+                </div>
+                <span className="bg-amber-500/20 text-amber-500 dark:text-amber-300 text-[8px] font-bold px-1.5 py-0.5 rounded uppercase">
+                  SLA
+                </span>
               </div>
-              <span className="bg-amber-500/20 text-amber-500 dark:text-amber-300 text-[8px] font-bold px-1.5 py-0.5 rounded uppercase">
-                SLA
-              </span>
-            </div>
 
-            <div className="flex items-center justify-center py-1.5 relative w-full">
-              <svg className="w-14 h-14 transform -rotate-90">
-                <circle cx="28" cy="28" r="22" className={`fill-none ${isLight ? 'stroke-slate-100' : 'stroke-white/10'}`} strokeWidth="4" />
-                <circle
-                  cx="28"
-                  cy="28"
-                  r="22"
-                  className="stroke-amber-400 fill-none transition-all duration-1000"
-                  strokeWidth="4"
-                  strokeDasharray={2 * Math.PI * 22}
-                  strokeDashoffset={2 * Math.PI * 22 * (1 - pmStats.percentage / 100)}
-                  strokeLinecap="round"
-                />
-              </svg>
-              <div className="absolute inset-0 flex items-center justify-center flex-col">
-                <span className={`text-[10px] font-black ${isLight ? 'text-slate-800' : 'text-white'}`}>{pmStats.percentage}%</span>
-                <span className={`text-[7px] font-bold uppercase ${isLight ? 'text-slate-400' : 'text-white/50'}`}>Ready</span>
+              <div className="flex items-center justify-center py-1.5 relative w-full">
+                <svg className="w-14 h-14 transform -rotate-90">
+                  <circle cx="28" cy="28" r="22" className={`fill-none ${isLight ? 'stroke-slate-100' : 'stroke-white/10'}`} strokeWidth="4" />
+                  <circle
+                    cx="28"
+                    cy="28"
+                    r="22"
+                    className="stroke-amber-400 fill-none transition-all duration-1000"
+                    strokeWidth="4"
+                    strokeDasharray={2 * Math.PI * 22}
+                    strokeDashoffset={2 * Math.PI * 22 * (1 - pmStats.percentage / 100)}
+                    strokeLinecap="round"
+                  />
+                </svg>
+                <div className="absolute inset-0 flex items-center justify-center flex-col">
+                  <span className={`text-[10px] font-black ${isLight ? 'text-slate-800' : 'text-white'}`}>{pmStats.percentage}%</span>
+                  <span className={`text-[7px] font-bold uppercase ${isLight ? 'text-slate-400' : 'text-white/50'}`}>Ready</span>
+                </div>
               </div>
-            </div>
 
-            <div className={`flex items-center justify-between w-full text-[8px] border-t pt-1 ${isLight ? 'text-slate-500 border-slate-100' : 'text-white/60 border-white/5'}`}>
-              <span>{pmStats.categories[3].value} Confirmed</span>
-              <ChevronRight className={`w-2.5 h-2.5 ${isLight ? 'text-slate-300' : 'text-white/40'}`} />
-            </div>
-          </button>
+              <div className={`flex items-center justify-between w-full text-[8px] border-t pt-1 ${isLight ? 'text-slate-500 border-slate-100' : 'text-white/60 border-white/5'}`}>
+                <span>{pmStats.categories[3].value} Confirmed</span>
+                <ChevronRight className={`w-2.5 h-2.5 ${isLight ? 'text-slate-300' : 'text-white/40'}`} />
+              </div>
+            </button>
+          )}
 
           {/* Card 4: Breakdowns */}
-          <button
-            onClick={() => setExpandedCard(expandedCard === 'breakdown' ? null : 'breakdown')}
-            className={`rounded-2xl p-3.5 border text-left shadow-lg relative overflow-hidden flex flex-col justify-between h-[160px] transition-all cursor-pointer ${
-              isLight
-                ? 'bg-white border-slate-200/80 text-slate-800'
-                : 'bg-white/10 backdrop-blur-md border-white/10 text-white'
-            } ${
-              expandedCard === 'breakdown' 
-                ? `ring-2 ring-rose-400 ${isLight ? 'bg-rose-50/50' : 'bg-white/15'}` 
-                : isLight ? 'hover:bg-slate-50' : 'hover:bg-white/15'
-            }`}
-          >
-            <div className="flex justify-between items-start w-full">
-              <div>
-                <p className={`text-[10px] font-extrabold uppercase tracking-wider ${isLight ? 'text-slate-400' : 'text-white/40'}`}>Breakdowns</p>
-                <h3 className="text-xl font-black mt-0.5 text-rose-500 dark:text-rose-400">{breakdownStats.total}</h3>
+          {(filterMode === 'overview' || filterMode === 'track') && (
+            <button
+              onClick={() => setExpandedCard(expandedCard === 'breakdown' ? null : 'breakdown')}
+              className={`rounded-2xl p-3.5 border text-left shadow-lg relative overflow-hidden flex flex-col justify-between h-[160px] transition-all cursor-pointer ${
+                isLight
+                  ? 'bg-white border-slate-200/80 text-slate-800'
+                  : 'bg-white/10 backdrop-blur-md border-white/10 text-white'
+              } ${
+                expandedCard === 'breakdown' 
+                  ? `ring-2 ring-rose-400 ${isLight ? 'bg-rose-50/50' : 'bg-white/15'}` 
+                  : isLight ? 'hover:bg-slate-50' : 'hover:bg-white/15'
+              }`}
+            >
+              <div className="flex justify-between items-start w-full">
+                <div>
+                  <p className={`text-[10px] font-extrabold uppercase tracking-wider ${isLight ? 'text-slate-400' : 'text-white/40'}`}>Breakdowns</p>
+                  <h3 className="text-xl font-black mt-0.5 text-rose-500 dark:text-rose-400">{breakdownStats.total}</h3>
+                </div>
+                <span className="bg-rose-500/20 text-rose-500 dark:text-rose-300 text-[8px] font-bold px-1.5 py-0.5 rounded uppercase animate-pulse">
+                  SLA Alert
+                </span>
               </div>
-              <span className="bg-rose-500/20 text-rose-500 dark:text-rose-300 text-[8px] font-bold px-1.5 py-0.5 rounded uppercase animate-pulse">
-                SLA Alert
-              </span>
-            </div>
 
-            <div className="flex items-center justify-center py-1.5 relative w-full">
-              <svg className="w-14 h-14 transform -rotate-90">
-                <circle cx="28" cy="28" r="22" className={`fill-none ${isLight ? 'stroke-slate-100' : 'stroke-white/10'}`} strokeWidth="4" />
-                <circle
-                  cx="28"
-                  cy="28"
-                  r="22"
-                  className="stroke-rose-400 fill-none transition-all duration-1000"
-                  strokeWidth="4"
-                  strokeDasharray={2 * Math.PI * 22}
-                  strokeDashoffset={2 * Math.PI * 22 * (1 - breakdownStats.percentage / 100)}
-                  strokeLinecap="round"
-                />
-              </svg>
-              <div className="absolute inset-0 flex items-center justify-center flex-col">
-                <span className={`text-[10px] font-black ${isLight ? 'text-rose-600' : 'text-rose-400'}`}>{breakdownStats.percentage}%</span>
-                <span className={`text-[7px] font-bold uppercase ${isLight ? 'text-slate-400' : 'text-white/50'}`}>Fixed</span>
+              <div className="flex items-center justify-center py-1.5 relative w-full">
+                <svg className="w-14 h-14 transform -rotate-90">
+                  <circle cx="28" cy="28" r="22" className={`fill-none ${isLight ? 'stroke-slate-100' : 'stroke-white/10'}`} strokeWidth="4" />
+                  <circle
+                    cx="28"
+                    cy="28"
+                    r="22"
+                    className="stroke-rose-400 fill-none transition-all duration-1000"
+                    strokeWidth="4"
+                    strokeDasharray={2 * Math.PI * 22}
+                    strokeDashoffset={2 * Math.PI * 22 * (1 - breakdownStats.percentage / 100)}
+                    strokeLinecap="round"
+                  />
+                </svg>
+                <div className="absolute inset-0 flex items-center justify-center flex-col">
+                  <span className={`text-[10px] font-black ${isLight ? 'text-rose-600' : 'text-rose-400'}`}>{breakdownStats.percentage}%</span>
+                  <span className={`text-[7px] font-bold uppercase ${isLight ? 'text-slate-400' : 'text-white/50'}`}>Fixed</span>
+                </div>
               </div>
-            </div>
 
-            <div className={`flex items-center justify-between w-full text-[8px] border-t pt-1 ${isLight ? 'text-slate-500 border-slate-100' : 'text-white/60 border-white/5'}`}>
-              <span>{breakdownStats.categories[0].value} Emergency</span>
-              <ChevronRight className={`w-2.5 h-2.5 ${isLight ? 'text-slate-300' : 'text-white/40'}`} />
-            </div>
-          </button>
+              <div className={`flex items-center justify-between w-full text-[8px] border-t pt-1 ${isLight ? 'text-slate-500 border-slate-100' : 'text-white/60 border-white/5'}`}>
+                <span>{breakdownStats.categories[0].value} Emergency</span>
+                <ChevronRight className={`w-2.5 h-2.5 ${isLight ? 'text-slate-300' : 'text-white/40'}`} />
+              </div>
+            </button>
+          )}
 
         </div>
 
@@ -514,222 +528,314 @@ export default function Dashboard() {
         )}
 
         {/* Project Budget & Expenses Widget */}
-        <div className={`rounded-2xl p-4 border shadow-lg space-y-3.5 ${
-          isLight ? 'bg-white border-slate-200 text-slate-800' : 'bg-white/10 backdrop-blur-md border-white/10 text-white'
-        }`}>
-          <div className="flex justify-between items-center">
-            <div className="flex items-center gap-2">
-              <DollarSign className="w-4 h-4 text-emerald-500" />
-              <h4 className={`text-[11px] font-bold uppercase tracking-wider ${isLight ? 'text-slate-800' : 'text-white'}`}>Project Expenses</h4>
-            </div>
-            <button 
-              onClick={() => navigate('/finance')}
-              className="text-[9px] text-sky-500 font-extrabold flex items-center gap-1 uppercase hover:underline cursor-pointer"
-            >
-              Manage <ArrowUpRight className="w-3 h-3" />
-            </button>
-          </div>
-
-          {/* Quick projects overview bar */}
-          <div className="space-y-2.5">
-            {projects.slice(0, 3).map((proj) => {
-              const totalSpent = proj.expenses ? proj.expenses.reduce((s, e) => s + e.amount, 0) : 0;
-              const spendRate = proj.budget > 0 ? Math.round((totalSpent / proj.budget) * 100) : 0;
-              return (
-                <div key={proj.id} className={`p-2.5 rounded-xl border ${isLight ? 'bg-slate-50 border-slate-100' : 'bg-white/5 border-white/5'}`}>
-                  <div className="flex justify-between text-[11px] font-bold">
-                    <span className="truncate max-w-[140px]">{proj.name}</span>
-                    <span className="font-mono text-emerald-500">AED {totalSpent.toLocaleString()} / AED {proj.budget.toLocaleString()}</span>
-                  </div>
-                  <div className="mt-1.5 h-1.5 bg-slate-200 dark:bg-white/5 rounded-full overflow-hidden">
-                    <div 
-                      className={`h-full rounded-full ${spendRate > proj.completed ? 'bg-rose-500 animate-pulse' : 'bg-sky-500'}`} 
-                      style={{ width: `${spendRate}%` }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Direct dashboard operations */}
-          <div className="grid grid-cols-2 gap-2 pt-1 border-t border-white/5">
-            <button 
-              type="button"
-              onClick={() => {
-                setShowDashAddProj(!showDashAddProj);
-                setShowDashAddExp(false);
-              }}
-              className="py-2 px-1.5 rounded-xl border border-dashed border-sky-400/30 text-sky-500 font-extrabold text-[9px] uppercase tracking-wide text-center cursor-pointer"
-            >
-              + Add Project
-            </button>
-            <button 
-              type="button"
-              onClick={() => {
-                setShowDashAddExp(!showDashAddExp);
-                setShowDashAddProj(false);
-              }}
-              className="py-2 px-1.5 rounded-xl bg-sky-500 text-white font-extrabold text-[9px] uppercase tracking-wide text-center cursor-pointer shadow-md"
-            >
-              + Log Expense
-            </button>
-          </div>
-
-          {/* Inline Form: Add Project */}
-          {showDashAddProj && (
-            <form onSubmit={handleDashCreateProj} className={`p-3 rounded-xl border space-y-2.5 text-xs ${isLight ? 'bg-slate-50 border-slate-200' : 'bg-white/5 border-white/10'}`}>
-              <div className="flex justify-between items-center">
-                <span className="text-[10px] font-black uppercase text-sky-500">Add Project</span>
-                <button type="button" onClick={() => setShowDashAddProj(false)} className="text-[9px] opacity-60">Close</button>
+        {(filterMode === 'overview' || filterMode === 'analyze') && (
+          <div className={`rounded-2xl p-4 border shadow-lg space-y-3.5 ${
+            isLight ? 'bg-white border-slate-200 text-slate-800' : 'bg-white/10 backdrop-blur-md border-white/10 text-white'
+          }`}>
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <DollarSign className="w-4 h-4 text-emerald-500" />
+                <h4 className={`text-[11px] font-bold uppercase tracking-wider ${isLight ? 'text-slate-800' : 'text-white'}`}>Project Expenses</h4>
               </div>
-              <input 
-                type="text" 
-                placeholder="Project / Client Name" 
-                required
-                value={dashProjName}
-                onChange={(e) => setDashProjName(e.target.value)}
-                className={`w-full rounded-lg px-2.5 py-1.5 border text-[11px] outline-none ${isLight ? 'bg-white text-slate-800' : 'bg-slate-950/50 text-white border-white/10'}`}
-              />
-              <div className="grid grid-cols-2 gap-2">
-                <select 
-                  value={dashProjLocation} 
-                  onChange={(e) => setDashProjLocation(e.target.value)}
-                  className={`rounded-lg px-1.5 py-1.5 border text-[11px] outline-none ${isLight ? 'bg-white text-slate-800' : 'bg-slate-950/50 text-white border-white/10'}`}
-                >
-                  <option value="Dubai">Dubai</option>
-                  <option value="Abu Dhabi">Abu Dhabi</option>
-                  <option value="Sharjah">Sharjah</option>
-                </select>
-                <input 
-                  type="number" 
-                  placeholder="Budget (AED)" 
-                  required
-                  value={dashProjBudget}
-                  onChange={(e) => setDashProjBudget(e.target.value)}
-                  className={`rounded-lg px-2.5 py-1.5 border text-[11px] outline-none font-mono ${isLight ? 'bg-white text-slate-800' : 'bg-slate-950/50 text-white border-white/10'}`}
-                />
-              </div>
-              <button type="submit" className="w-full py-1.5 bg-sky-500 text-white text-[10px] uppercase font-black rounded-lg cursor-pointer">Create</button>
-            </form>
-          )}
-
-          {/* Inline Form: Add Expense */}
-          {showDashAddExp && (
-            <form onSubmit={handleDashCreateExp} className={`p-3 rounded-xl border space-y-2.5 text-xs ${isLight ? 'bg-slate-50 border-slate-200' : 'bg-white/5 border-white/10'}`}>
-              <div className="flex justify-between items-center">
-                <span className="text-[10px] font-black uppercase text-sky-500">Log Expense</span>
-                <button type="button" onClick={() => setShowDashAddExp(false)} className="text-[9px] opacity-60">Close</button>
-              </div>
-              <select 
-                value={dashSelectedProj}
-                onChange={(e) => setDashSelectedProj(e.target.value)}
-                className={`w-full rounded-lg px-2 py-1.5 border text-[11px] outline-none ${isLight ? 'bg-white text-slate-800' : 'bg-slate-950/50 text-white border-white/10'}`}
+              <button 
+                onClick={() => navigate('/finance')}
+                className="text-[9px] text-sky-500 font-extrabold flex items-center gap-1 uppercase hover:underline cursor-pointer"
               >
-                <option value="">-- Select Project --</option>
-                {projects.map(p => (
-                  <option key={p.id} value={p.id}>{p.id} - {p.name}</option>
-                ))}
-              </select>
-              <input 
-                type="text" 
-                placeholder="Expense Description" 
-                required
-                value={dashExpTitle}
-                onChange={(e) => setDashExpTitle(e.target.value)}
-                className={`w-full rounded-lg px-2.5 py-1.5 border text-[11px] outline-none ${isLight ? 'bg-white text-slate-800' : 'bg-slate-950/50 text-white border-white/10'}`}
-              />
-              <div className="grid grid-cols-2 gap-2">
+                Manage <ArrowUpRight className="w-3 h-3" />
+              </button>
+            </div>
+
+            {/* Quick projects overview bar */}
+            <div className="space-y-2.5">
+              {projects.length === 0 ? (
+                <div className={`p-4 rounded-xl border text-center transition-colors duration-300 ${isLight ? 'bg-slate-50 border-slate-100' : 'bg-white/5 border-white/5'}`}>
+                  <p className={`text-[10px] font-medium ${isLight ? 'text-slate-500' : 'text-white/40'}`}>No active elevator projects.</p>
+                  <button
+                    onClick={() => setShowDashAddProj(true)}
+                    className="text-[10px] text-sky-500 hover:underline font-extrabold mt-1"
+                  >
+                    + Create First Project
+                  </button>
+                </div>
+              ) : (
+                projects.slice(0, 3).map((proj) => {
+                  const totalSpent = proj.expenses ? proj.expenses.reduce((s, e) => s + e.amount, 0) : 0;
+                  const spendRate = proj.budget > 0 ? Math.round((totalSpent / proj.budget) * 100) : 0;
+                  return (
+                    <div key={proj.id} className={`p-2.5 rounded-xl border ${isLight ? 'bg-slate-50 border-slate-100' : 'bg-white/5 border-white/5'}`}>
+                      <div className="flex justify-between text-[11px] font-bold">
+                        <span className="truncate max-w-[140px]">{proj.name}</span>
+                        <span className="font-mono text-emerald-500">AED {totalSpent.toLocaleString()} / AED {proj.budget.toLocaleString()}</span>
+                      </div>
+                      <div className="mt-1.5 h-1.5 bg-slate-200 dark:bg-white/5 rounded-full overflow-hidden">
+                        <div 
+                          className={`h-full rounded-full ${spendRate > proj.completed ? 'bg-rose-500 animate-pulse' : 'bg-sky-500'}`} 
+                          style={{ width: `${spendRate}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Direct dashboard operations */}
+            <div className="grid grid-cols-2 gap-2 pt-1 border-t border-white/5">
+              <button 
+                type="button"
+                onClick={() => {
+                  setShowDashAddProj(!showDashAddProj);
+                  setShowDashAddExp(false);
+                }}
+                className="py-2 px-1.5 rounded-xl border border-dashed border-sky-400/30 text-sky-500 font-extrabold text-[9px] uppercase tracking-wide text-center cursor-pointer"
+              >
+                + Add Project
+              </button>
+              <button 
+                type="button"
+                onClick={() => {
+                  setShowDashAddExp(!showDashAddExp);
+                  setShowDashAddProj(false);
+                }}
+                className="py-2 px-1.5 rounded-xl bg-sky-500 text-white font-extrabold text-[9px] uppercase tracking-wide text-center cursor-pointer shadow-md"
+              >
+                + Log Expense
+              </button>
+            </div>
+
+            {/* Inline Form: Add Project */}
+            {showDashAddProj && (
+              <form onSubmit={handleDashCreateProj} className={`p-3 rounded-xl border space-y-2.5 text-xs ${isLight ? 'bg-slate-50 border-slate-200' : 'bg-white/5 border-white/10'}`}>
+                <div className="flex justify-between items-center">
+                  <span className="text-[10px] font-black uppercase text-sky-500">Add Project</span>
+                  <button type="button" onClick={() => setShowDashAddProj(false)} className="text-[9px] opacity-60">Close</button>
+                </div>
+                <input 
+                  type="text" 
+                  placeholder="Project / Client Name" 
+                  required
+                  value={dashProjName}
+                  onChange={(e) => setDashProjName(e.target.value)}
+                  className={`w-full rounded-lg px-2.5 py-1.5 border text-[11px] outline-none ${isLight ? 'bg-white text-slate-800' : 'bg-slate-950/50 text-white border-white/10'}`}
+                />
+                <div className="grid grid-cols-2 gap-2">
+                  <select 
+                    value={dashProjLocation} 
+                    onChange={(e) => setDashProjLocation(e.target.value)}
+                    className={`rounded-lg px-1.5 py-1.5 border text-[11px] outline-none ${isLight ? 'bg-white text-slate-800' : 'bg-slate-950/50 text-white border-white/10'}`}
+                  >
+                    <option value="Dubai">Dubai</option>
+                    <option value="Abu Dhabi">Abu Dhabi</option>
+                    <option value="Sharjah">Sharjah</option>
+                  </select>
+                  <input 
+                    type="number" 
+                    placeholder="Budget (AED)" 
+                    required
+                    value={dashProjBudget}
+                    onChange={(e) => setDashProjBudget(e.target.value)}
+                    className={`rounded-lg px-2.5 py-1.5 border text-[11px] outline-none font-mono ${isLight ? 'bg-white text-slate-800' : 'bg-slate-950/50 text-white border-white/10'}`}
+                  />
+                </div>
+                <button type="submit" className="w-full py-1.5 bg-sky-500 text-white text-[10px] uppercase font-black rounded-lg cursor-pointer">Create</button>
+              </form>
+            )}
+
+            {/* Inline Form: Add Expense */}
+            {showDashAddExp && (
+              <form onSubmit={handleDashCreateExp} className={`p-3 rounded-xl border space-y-2.5 text-xs ${isLight ? 'bg-slate-50 border-slate-200' : 'bg-white/5 border-white/10'}`}>
+                <div className="flex justify-between items-center">
+                  <span className="text-[10px] font-black uppercase text-sky-500">Log Expense</span>
+                  <button type="button" onClick={() => setShowDashAddExp(false)} className="text-[9px] opacity-60">Close</button>
+                </div>
                 <select 
-                  value={dashExpCat} 
-                  onChange={(e) => setDashExpCat(e.target.value as any)}
-                  className={`rounded-lg px-1 py-1.5 border text-[11px] outline-none ${isLight ? 'bg-white text-slate-800' : 'bg-slate-950/50 text-white border-white/10'}`}
+                  value={dashSelectedProj}
+                  onChange={(e) => setDashSelectedProj(e.target.value)}
+                  className={`w-full rounded-lg px-2 py-1.5 border text-[11px] outline-none ${isLight ? 'bg-white text-slate-800' : 'bg-slate-950/50 text-white border-white/10'}`}
                 >
-                  <option value="Materials">Materials</option>
-                  <option value="Labor">Labor</option>
-                  <option value="Permits">Permits</option>
-                  <option value="Logistics">Logistics</option>
-                  <option value="Repairs">Repairs</option>
-                  <option value="Maintenance">Maintenance</option>
-                  <option value="Other">Other</option>
+                  <option value="">-- Select Project --</option>
+                  {projects.map(p => (
+                    <option key={p.id} value={p.id}>{p.id} - {p.name}</option>
+                  ))}
                 </select>
                 <input 
-                  type="number" 
-                  placeholder="Cost (AED)" 
+                  type="text" 
+                  placeholder="Expense Description" 
                   required
-                  value={dashExpAmount}
-                  onChange={(e) => setDashExpAmount(e.target.value)}
-                  className={`rounded-lg px-2.5 py-1.5 border text-[11px] outline-none font-mono ${isLight ? 'bg-white text-slate-800' : 'bg-slate-950/50 text-white border-white/10'}`}
+                  value={dashExpTitle}
+                  onChange={(e) => setDashExpTitle(e.target.value)}
+                  className={`w-full rounded-lg px-2.5 py-1.5 border text-[11px] outline-none ${isLight ? 'bg-white text-slate-800' : 'bg-slate-950/50 text-white border-white/10'}`}
                 />
-              </div>
-              <button type="submit" className="w-full py-1.5 bg-sky-500 text-white text-[10px] uppercase font-black rounded-lg cursor-pointer">Save Charge</button>
-            </form>
-          )}
+                <div className="grid grid-cols-2 gap-2">
+                  <select 
+                    value={dashExpCat} 
+                    onChange={(e) => setDashExpCat(e.target.value as any)}
+                    className={`rounded-lg px-1 py-1.5 border text-[11px] outline-none ${isLight ? 'bg-white text-slate-800' : 'bg-slate-950/50 text-white border-white/10'}`}
+                  >
+                    <option value="Materials">Materials</option>
+                    <option value="Labor">Labor</option>
+                    <option value="Permits">Permits</option>
+                    <option value="Logistics">Logistics</option>
+                    <option value="Repairs">Repairs</option>
+                    <option value="Maintenance">Maintenance</option>
+                    <option value="Other">Other</option>
+                  </select>
+                  <input 
+                    type="number" 
+                    placeholder="Cost (AED)" 
+                    required
+                    value={dashExpAmount}
+                    onChange={(e) => setDashExpAmount(e.target.value)}
+                    className={`rounded-lg px-2.5 py-1.5 border text-[11px] outline-none font-mono ${isLight ? 'bg-white text-slate-800' : 'bg-slate-950/50 text-white border-white/10'}`}
+                  />
+                </div>
+                <button type="submit" className="w-full py-1.5 bg-sky-500 text-white text-[10px] uppercase font-black rounded-lg cursor-pointer">Save Charge</button>
+              </form>
+            )}
 
-          {/* AI Home Assistant recommendation banner */}
-          <div className="p-2.5 rounded-xl bg-gradient-to-r from-sky-500/10 to-indigo-500/10 border border-sky-400/15 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Sparkles className="w-3.5 h-3.5 text-yellow-400 animate-pulse" />
-              <p className="text-[10px] font-bold text-sky-400">Consult Gemini Advisor</p>
+            {/* AI Home Assistant recommendation banner */}
+            <div className="p-2.5 rounded-xl bg-gradient-to-r from-sky-500/10 to-indigo-500/10 border border-sky-400/15 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-3.5 h-3.5 text-yellow-400 animate-pulse" />
+                <p className="text-[10px] font-bold text-sky-400">Consult Gemini Advisor</p>
+              </div>
+              <button 
+                type="button"
+                onClick={() => navigate('/finance')}
+                className="text-[9px] bg-sky-500 text-white px-2.5 py-1 rounded uppercase font-black cursor-pointer shadow-sm"
+              >
+                Go
+              </button>
             </div>
-            <button 
-              type="button"
-              onClick={() => navigate('/finance')}
-              className="text-[9px] bg-sky-500 text-white px-2.5 py-1 rounded uppercase font-black cursor-pointer shadow-sm"
-            >
-              Go
-            </button>
           </div>
-        </div>
+        )}
+
+        {/* Live GPS Tracking Dispatch Map Link for Track Mode */}
+        {filterMode === 'track' && (
+          <div className={`rounded-2xl p-4 border shadow-lg space-y-3.5 ${
+            isLight ? 'bg-white border-slate-200 text-slate-800' : 'bg-white/10 backdrop-blur-md border-white/10 text-white'
+          }`}>
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <MapPin className="w-4 h-4 text-sky-400" />
+                <h4 className={`text-[11px] font-bold uppercase tracking-wider ${isLight ? 'text-slate-800' : 'text-white'}`}>Field GPS Dispatch</h4>
+              </div>
+              <span className="text-[8px] bg-sky-500/20 text-sky-500 dark:text-sky-300 font-bold px-2 py-0.5 rounded uppercase">Live Radar</span>
+            </div>
+            
+            <div className={`p-3 rounded-xl border flex items-center justify-between gap-3 ${isLight ? 'bg-slate-50 border-slate-100' : 'bg-white/5 border-white/5'}`}>
+              <div className="flex items-center gap-2.5">
+                <div className="relative">
+                  <span className="flex h-2.5 w-2.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full bg-emerald-400 rounded-full opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                  </span>
+                </div>
+                <div className="flex flex-col text-left">
+                  <span className="text-xs font-bold">14 Active Technicians</span>
+                  <span className={`text-[9px] ${isLight ? 'text-slate-500' : 'text-white/50'}`}>Live on-route monitoring active</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => navigate('/map')}
+                className="py-1.5 px-3 bg-sky-500 hover:bg-sky-600 text-white text-[10px] uppercase font-black rounded-lg cursor-pointer transition-colors"
+              >
+                Open Map
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Distribution Analysis for Analyze Mode */}
+        {filterMode === 'analyze' && (
+          <div className={`rounded-2xl p-4 border shadow-lg space-y-4 ${
+            isLight ? 'bg-white border-slate-200 text-slate-800' : 'bg-white/10 backdrop-blur-md border-white/10 text-white'
+          }`}>
+            <div className="flex justify-between items-center">
+              <h4 className="text-[11px] font-bold uppercase tracking-wider text-sky-500">Distribution Analysis</h4>
+              <span className="text-[8px] uppercase tracking-wider font-extrabold opacity-60">Visual CRM</span>
+            </div>
+            <div className="h-40 w-full flex items-center justify-center">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={enquiriesStats.categories.filter(c => c.value > 0)}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={40}
+                    outerRadius={55}
+                    paddingAngle={3}
+                    dataKey="value"
+                  >
+                    {enquiriesStats.categories.filter(c => c.value > 0).map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-[10px] font-semibold text-left">
+              {enquiriesStats.categories.filter(c => c.value > 0).map((cat, idx) => (
+                <div key={idx} className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full flex-none" style={{ backgroundColor: cat.color }}></span>
+                  <span className="truncate opacity-80">{cat.name}: {cat.value}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Live Active Incident Ticket Feed */}
-        <div className={`rounded-2xl p-4 border shadow-lg space-y-3 ${
-          isLight ? 'bg-white border-slate-200 text-slate-800' : 'bg-white/10 backdrop-blur-md border-white/10 text-white'
-        }`}>
-          <div className="flex justify-between items-center">
-            <div className="flex items-center gap-2">
-              <BarChart3 className="w-4 h-4 text-sky-400" />
-              <h4 className={`text-[11px] font-bold uppercase tracking-wider ${isLight ? 'text-slate-800' : 'text-white'}`}>Active Field Logs</h4>
-            </div>
-            <span className="text-[8px] bg-sky-500/20 text-sky-500 dark:text-sky-300 font-bold px-2 py-0.5 rounded border border-sky-400/20 uppercase">Live Feed</span>
-          </div>
-
-          <div className="space-y-3">
-            <div className={`flex items-start gap-3 p-3 rounded-xl border ${isLight ? 'bg-slate-50 border-slate-100' : 'bg-white/5 border-white/10'}`}>
-              <div className="p-1.5 bg-rose-500/20 rounded text-rose-500 dark:text-rose-400 mt-0.5">
-                <ShieldAlert className="w-4 h-4 animate-pulse" />
+        {(filterMode === 'overview' || filterMode === 'track') && (
+          <div className={`rounded-2xl p-4 border shadow-lg space-y-3 ${
+            isLight ? 'bg-white border-slate-200 text-slate-800' : 'bg-white/10 backdrop-blur-md border-white/10 text-white'
+          }`}>
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <BarChart3 className="w-4 h-4 text-sky-400" />
+                <h4 className={`text-[11px] font-bold uppercase tracking-wider ${isLight ? 'text-slate-800' : 'text-white'}`}>Active Field Logs</h4>
               </div>
-              <div className="flex-1">
-                <div className="flex justify-between items-center">
-                  <p className={`text-xs font-black ${isLight ? 'text-slate-900' : 'text-white'}`}>Breakdown Escalation</p>
-                  <span className={`text-[9px] font-mono ${isLight ? 'text-slate-400' : 'text-white/40'}`}>10m ago</span>
-                </div>
-                <p className={`text-[11px] mt-1 ${isLight ? 'text-slate-600' : 'text-white/70'}`}>ARD system error reported at Creation Plaza Tower A.</p>
-                <p className="text-[10px] text-sky-500 dark:text-sky-300 font-bold mt-1 flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-ping"></span>
-                  Representative dispatched via live tracking.
-                </p>
-              </div>
+              <span className="text-[8px] bg-sky-500/20 text-sky-500 dark:text-sky-300 font-bold px-2 py-0.5 rounded border border-sky-400/20 uppercase">Live Feed</span>
             </div>
 
-            <div className={`flex items-start gap-3 p-3 rounded-xl border ${isLight ? 'bg-slate-50 border-slate-100' : 'bg-white/5 border-white/10'}`}>
-              <div className="p-1.5 bg-emerald-500/20 rounded text-emerald-500 dark:text-emerald-400 mt-0.5">
-                <CheckCircle2 className="w-4 h-4" />
-              </div>
-              <div className="flex-1">
-                <div className="flex justify-between items-center">
-                  <p className={`text-xs font-black ${isLight ? 'text-slate-900' : 'text-white'}`}>PM Inspection Finished</p>
-                  <span className={`text-[9px] font-mono ${isLight ? 'text-slate-400' : 'text-white/40'}`}>1h ago</span>
+            <div className="space-y-3">
+              <div className={`flex items-start gap-3 p-3 rounded-xl border ${isLight ? 'bg-slate-50 border-slate-100' : 'bg-white/5 border-white/10'}`}>
+                <div className="p-1.5 bg-rose-500/20 rounded text-rose-500 dark:text-rose-400 mt-0.5">
+                  <ShieldAlert className="w-4 h-4 animate-pulse" />
                 </div>
-                <p className={`text-[11px] mt-1 ${isLight ? 'text-slate-600' : 'text-white/70'}`}>Routine AMC check finalized at Patil Industries Lift B.</p>
-                <div className="mt-2 flex items-center gap-2">
-                  <StatusBadge type="success" text="QC Certified" />
-                  <span className={`text-[10px] font-mono ${isLight ? 'text-slate-400' : 'text-white/50'}`}>ID: SLA-9022</span>
+                <div className="flex-1 text-left">
+                  <div className="flex justify-between items-center">
+                    <p className={`text-xs font-black ${isLight ? 'text-slate-900' : 'text-white'}`}>Breakdown Escalation</p>
+                    <span className={`text-[9px] font-mono ${isLight ? 'text-slate-400' : 'text-white/40'}`}>10m ago</span>
+                  </div>
+                  <p className={`text-[11px] mt-1 ${isLight ? 'text-slate-600' : 'text-white/70'}`}>ARD system error reported at Creation Plaza Tower A.</p>
+                  <p className="text-[10px] text-sky-500 dark:text-sky-300 font-bold mt-1 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-ping"></span>
+                    Representative dispatched via live tracking.
+                  </p>
+                </div>
+              </div>
+
+              <div className={`flex items-start gap-3 p-3 rounded-xl border ${isLight ? 'bg-slate-50 border-slate-100' : 'bg-white/5 border-white/10'}`}>
+                <div className="p-1.5 bg-emerald-500/20 rounded text-emerald-500 dark:text-emerald-400 mt-0.5">
+                  <CheckCircle2 className="w-4 h-4" />
+                </div>
+                <div className="flex-1 text-left">
+                  <div className="flex justify-between items-center">
+                    <p className={`text-xs font-black ${isLight ? 'text-slate-900' : 'text-white'}`}>PM Inspection Finished</p>
+                    <span className={`text-[9px] font-mono ${isLight ? 'text-slate-400' : 'text-white/40'}`}>1h ago</span>
+                  </div>
+                  <p className={`text-[11px] mt-1 ${isLight ? 'text-slate-600' : 'text-white/70'}`}>Routine AMC check finalized at Patil Industries Lift B.</p>
+                  <div className="mt-2 flex items-center gap-2">
+                    <StatusBadge type="success" text="QC Certified" />
+                    <span className={`text-[10px] font-mono ${isLight ? 'text-slate-400' : 'text-white/50'}`}>ID: SLA-9022</span>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
       </YStack>
     </div>
 
