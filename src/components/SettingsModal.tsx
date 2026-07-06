@@ -36,24 +36,15 @@ export default function SettingsModal() {
   const [isLegalOpen, setIsLegalOpen] = useState(false);
   const [legalTab, setLegalTab] = useState<'privacy' | 'terms' | 'cca'>('privacy');
 
-  // App Rating States
-  const [appRating, setAppRating] = useState<number>(() => {
-    return Number(localStorage.getItem('taj_app_rating') || '0');
-  });
+  // App Rating States (in-memory only)
+  const [appRating, setAppRating] = useState<number>(0);
   const [hoverRating, setHoverRating] = useState<number>(0);
-  const [ratingFeedback, setRatingFeedback] = useState<string>(() => {
-    return localStorage.getItem('taj_app_rating_feedback') || '';
-  });
-  const [isRatingSubmitted, setIsRatingSubmitted] = useState<boolean>(() => {
-    return localStorage.getItem('taj_app_rating_submitted') === 'true';
-  });
+  const [ratingFeedback, setRatingFeedback] = useState<string>('');
+  const [isRatingSubmitted, setIsRatingSubmitted] = useState<boolean>(false);
 
   const handleRatingSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (appRating === 0) return;
-    localStorage.setItem('taj_app_rating', appRating.toString());
-    localStorage.setItem('taj_app_rating_feedback', ratingFeedback);
-    localStorage.setItem('taj_app_rating_submitted', 'true');
     setIsRatingSubmitted(true);
   };
 

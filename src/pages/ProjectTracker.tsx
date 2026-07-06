@@ -1,26 +1,53 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   ArrowLeft, Clock, Calendar, AlertTriangle, Play, CheckCircle, ChevronRight, 
   Calculator, Download, ExternalLink, Mail, Phone, Globe, CreditCard, 
   FileCheck, DollarSign, Activity, FileText, CheckCircle2, Search, Filter, 
-  TrendingUp, RefreshCw, Sparkles, Building, Layers, Send, User, ShieldCheck, Check
+  TrendingUp, RefreshCw, Building, Layers, Send, User, ShieldCheck, Check
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import StatusBadge from '../components/StatusBadge';
 import { useNavigate } from 'react-router-dom';
 import { YStack, XStack, Heading, Text, Card, Button } from '../components/Tamagui';
 import { useProfile } from '../components/ProfileContext';
+import { useProjects } from '../components/ProjectContext';
+import { collection, onSnapshot, addDoc, serverTimestamp, query, orderBy } from 'firebase/firestore';
+import { db } from '../lib/firebase';
+import { cacheSnapshot, addDocWithFallback } from '../lib/sync';
+
+interface PaymentEntry {
+  id?: string;
+  terms: string;
+  scope: string;
+  amount: string;
+  createdAt?: any;
+}
 
 export default function ProjectTracker() {
   const navigate = useNavigate();
-  const [activeSubTab, setActiveSubTab] = useState<'gantt' | 'estimation' | 'payments' | 'repair' | 'mis' | 'proposal' | 'strategy'>('gantt');
+  const [activeSubTab, setActiveSubTab] = useState<'gantt' | 'estimation' | 'payments' | 'repair' | 'mis' | 'strategy'>('gantt');
   const { theme } = useProfile();
+  const { projects } = useProjects();
+  const activeProject = projects[0];
   const isLight = theme === 'light';
 
   const [trackerAlert, setTrackerAlert] = useState<string | null>(null);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [bomDocDownloading, setBomDocDownloading] = useState<string | null>(null);
   const [bomCategory, setBomCategory] = useState<'all' | 'po' | 'grn' | 'dc'>('all');
+
+  const [paymentHistory, setPaymentHistory] = useState<PaymentEntry[]>([]);
+
+  useEffect(() => {
+    const q = query(collection(db, "payments"), orderBy("createdAt", "desc"));
+    const unsub = onSnapshot(q, (snap) => {
+      const list: PaymentEntry[] = [];
+      snap.forEach((d) => list.push({ id: d.id, ...d.data() } as PaymentEntry));
+      cacheSnapshot('payments', snap.docs);
+      setPaymentHistory(list);
+    });
+    return () => unsub();
+  }, []);
 
   const triggerAlert = (msg: string) => {
     setTrackerAlert(msg);
@@ -46,48 +73,37 @@ export default function ProjectTracker() {
   const grossTotal = subTotal + vat;
 
   // Payments log section matching PDF Page 7
-  const [paymentAmount, setPaymentAmount] = useState('1500000');
+  const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentType, setPaymentType] = useState('Advance');
-  const [paymentNote, setPaymentNote] = useState('First stage layout advance block payment');
-  const [paymentPhotos, setPaymentPhotos] = useState<string[]>([
-    'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=150&auto=format&fit=crop&q=80'
-  ]);
-
-  const [paymentHistory, setPaymentHistory] = useState([
-    { terms: 'Advance (50%)', scope: 'Before starting dispatch layout works', amount: 'AED 1,245,000' },
-    { terms: 'Material Delivery (40%)', scope: 'Before dispatching cabin & motor hoist units', amount: 'AED 1,050,000' },
-    { terms: 'Against Handover (10%)', scope: 'After local inspector clearance certificates', amount: 'AED 254,000' }
-  ]);
+  const [paymentNote, setPaymentNote] = useState('');
+  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
+  const [paymentPhotos, setPaymentPhotos] = useState<string[]>([]);
 
   const handleAddPaymentPhoto = () => {
-    setPaymentPhotos([
-      ...paymentPhotos,
-      'https://images.unsplash.com/photo-1559526324-4b87b5e36e44?w=150&auto=format&fit=crop&q=80'
-    ]);
-    triggerAlert("Payment confirmation receipt photo attached successfully!");
+    triggerAlert("Photo capture will be available in the mobile app.");
   };
 
-  const handleCollectPayment = (e: React.FormEvent) => {
+  const handleCollectPayment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!paymentAmount) return;
-    const newTerm = {
-      terms: `${paymentType} logged`,
-      scope: paymentNote || 'Direct bank clearance transaction record',
-      amount: `AED ${parseInt(paymentAmount).toLocaleString()}`
-    };
-    setPaymentHistory([newTerm, ...paymentHistory]);
-    setPaymentAmount('');
-    setPaymentNote('');
-    triggerAlert(`Payment of AED ${parseInt(paymentAmount).toLocaleString()} logged into ledger successfully!`);
+    try {
+      const refId = await addDocWithFallback('payments', {
+        terms: `${paymentType} logged`,
+        scope: paymentNote || 'Direct bank clearance transaction record',
+        amount: `AED ${parseInt(paymentAmount).toLocaleString()}`,
+        createdAt: serverTimestamp(),
+      });
+      setPaymentAmount('');
+      setPaymentNote('');
+      triggerAlert(`Payment of AED ${parseInt(paymentAmount).toLocaleString()} logged into ledger successfully!`);
+    } catch {
+      triggerAlert("Failed to log payment.");
+    }
   };
 
   // Tab 4: BOM & Repair documents list (Page 10 Center)
   const [searchDoc, setSearchDoc] = useState('');
-  const bomDocs = [
-    { id: 'PO-2025/1105', type: 'Purchase Order', supplier: 'Emirates Steel', warehouse: 'Jebel Ali WH', date: '01/05/2025', amount: 'AED 450,000' },
-    { id: 'GRN-2025/0841', type: 'Goods Receipt Note', supplier: 'Gulf Lift Motors', warehouse: 'Mussafah WH', date: '04/05/2025', amount: 'AED 890,000' },
-    { id: 'DC-2025/3291', type: 'Delivery Chalan', supplier: 'Al Quoz Logistics', warehouse: 'Al Quoz WH', date: '08/05/2025', amount: 'AED 1,220,000' }
-  ];
+  const bomDocs: { id: string; type: string; supplier: string; warehouse: string; date: string; amount: string }[] = [];
 
   const filteredDocs = bomDocs.filter(doc =>
     doc.id.toLowerCase().includes(searchDoc.toLowerCase()) ||
@@ -151,9 +167,7 @@ export default function ProjectTracker() {
           <Button variant={activeSubTab === 'mis' ? 'primary' : 'secondary'} onClick={() => setActiveSubTab('mis')} className="flex-none px-4 py-2">
             Structured MIS
           </Button>
-          <Button variant={activeSubTab === 'proposal' ? 'primary' : 'secondary'} onClick={() => setActiveSubTab('proposal')} className="flex-none px-4 py-2">
-            Client Proposal
-          </Button>
+
           <Button variant={activeSubTab === 'strategy' ? 'primary' : 'secondary'} onClick={() => setActiveSubTab('strategy')} className="flex-none px-4 py-2">
             Strategy Call
           </Button>
@@ -175,146 +189,75 @@ export default function ProjectTracker() {
             {activeSubTab === 'gantt' && (
               <div className="space-y-4">
                 
-                {/* Immersive Operational HUD Bento Card */}
-                <div className={`rounded-2xl p-4 border shadow-xl relative overflow-hidden transition-all duration-300 ${
-                  isLight 
-                    ? 'bg-white border-slate-200/80 shadow-slate-100' 
-                    : 'bg-slate-900/40 backdrop-blur-xl border-sky-500/10 shadow-black/40'
-                }`}>
-                  <div className="absolute right-[-12px] bottom-[-12px] opacity-10 pointer-events-none">
-                    <Activity className={`w-28 h-28 ${isLight ? 'text-slate-400' : 'text-sky-400'}`} />
-                  </div>
-
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <span className="text-[8px] bg-sky-500/15 text-sky-600 dark:text-sky-400 font-extrabold px-2.5 py-1 rounded-md border border-sky-500/20 uppercase tracking-widest block w-max mb-1.5">
-                        Active Project
-                      </span>
-                      <p className={`text-[9px] uppercase font-mono font-bold tracking-wider ${isLight ? 'text-slate-400' : 'text-white/40'}`}>
-                        ID: EVP-25-A04
-                      </p>
-                      <h3 className={`text-base font-black tracking-tight mt-0.5 ${isLight ? 'text-slate-900' : 'text-white'}`}>
-                        Wakad High-Speed Installation
-                      </h3>
-                      <p className="text-[11px] font-extrabold mt-1 text-emerald-500 flex items-center gap-1.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
-                        On Schedule · 65% Completed
-                      </p>
-                    </div>
-
-                    <div className="text-right">
-                      <span className="text-[9px] font-bold block opacity-60 uppercase">Completion</span>
-                      <span className="text-lg font-black font-mono text-sky-500">65%</span>
-                    </div>
-                  </div>
-
-                  {/* High Contrast Mini Metadata Row */}
-                  <div className={`grid grid-cols-3 gap-2.5 pt-3 mt-3 border-t text-center ${
-                    isLight ? 'border-slate-100' : 'border-white/5'
+                {activeProject && (
+                  <div className={`rounded-2xl p-4 border shadow-xl relative overflow-hidden transition-all duration-300 ${
+                    isLight 
+                      ? 'bg-white border-slate-200/80 shadow-slate-100' 
+                      : 'bg-slate-900/40 backdrop-blur-xl border-sky-500/10 shadow-black/40'
                   }`}>
-                    <div className="space-y-0.5">
-                      <span className={`text-[8px] font-bold block uppercase tracking-wider ${isLight ? 'text-slate-400' : 'text-white/30'}`}>Lead Engineer</span>
-                      <p className={`text-[10px] font-black flex items-center justify-center gap-1 ${isLight ? 'text-slate-800' : 'text-white/95'}`}>
-                        <User className="w-3 h-3 text-sky-500" />
-                        S. Shinde
-                      </p>
+                    <div className="absolute right-[-12px] bottom-[-12px] opacity-10 pointer-events-none">
+                      <Activity className={`w-28 h-28 ${isLight ? 'text-slate-400' : 'text-sky-400'}`} />
                     </div>
-                    <div className="space-y-0.5">
-                      <span className={`text-[8px] font-bold block uppercase tracking-wider ${isLight ? 'text-slate-400' : 'text-white/30'}`}>Days Remaining</span>
-                      <p className={`text-[10px] font-black flex items-center justify-center gap-1 ${isLight ? 'text-slate-800' : 'text-white/95'}`}>
-                        <Clock className="w-3 h-3 text-sky-500" />
-                        12 Days
-                      </p>
+
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <span className="text-[8px] bg-sky-500/15 text-sky-600 dark:text-sky-400 font-extrabold px-2.5 py-1 rounded-md border border-sky-500/20 uppercase tracking-widest block w-max mb-1.5">
+                          Active Project
+                        </span>
+                        <p className={`text-[9px] uppercase font-mono font-bold tracking-wider ${isLight ? 'text-slate-400' : 'text-white/40'}`}>
+                          ID: {activeProject.id}
+                        </p>
+                        <h3 className={`text-base font-black tracking-tight mt-0.5 ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                          {activeProject.name}
+                        </h3>
+                        <p className="text-[11px] font-extrabold mt-1 text-emerald-500 flex items-center gap-1.5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+                          {activeProject.status} · {activeProject.completed}% Completed
+                        </p>
+                      </div>
+
+                      <div className="text-right">
+                        <span className="text-[9px] font-bold block opacity-60 uppercase">Completion</span>
+                        <span className="text-lg font-black font-mono text-sky-500">{activeProject.completed}%</span>
+                      </div>
                     </div>
-                    <div className="space-y-0.5">
-                      <span className={`text-[8px] font-bold block uppercase tracking-wider ${isLight ? 'text-slate-400' : 'text-white/30'}`}>Safety SLA</span>
-                      <p className={`text-[10px] font-black flex items-center justify-center gap-1 text-emerald-500`}>
-                        <ShieldCheck className="w-3.5 h-3.5" />
-                        Compliant
-                      </p>
+
+                    <div className={`grid grid-cols-3 gap-2.5 pt-3 mt-3 border-t text-center ${
+                      isLight ? 'border-slate-100' : 'border-white/5'
+                    }`}>
+                      <div className="space-y-0.5">
+                        <span className={`text-[8px] font-bold block uppercase tracking-wider ${isLight ? 'text-slate-400' : 'text-white/30'}`}>Location</span>
+                        <p className={`text-[10px] font-black flex items-center justify-center gap-1 ${isLight ? 'text-slate-800' : 'text-white/95'}`}>
+                          <User className="w-3 h-3 text-sky-500" />
+                          {activeProject.location || 'N/A'}
+                        </p>
+                      </div>
+                      <div className="space-y-0.5">
+                        <span className={`text-[8px] font-bold block uppercase tracking-wider ${isLight ? 'text-slate-400' : 'text-white/30'}`}>Budget</span>
+                        <p className={`text-[10px] font-black flex items-center justify-center gap-1 ${isLight ? 'text-slate-800' : 'text-white/95'}`}>
+                          <Clock className="w-3 h-3 text-sky-500" />
+                          AED {activeProject.budget?.toLocaleString() || '0'}
+                        </p>
+                      </div>
+                      <div className="space-y-0.5">
+                        <span className={`text-[8px] font-bold block uppercase tracking-wider ${isLight ? 'text-slate-400' : 'text-white/30'}`}>Status</span>
+                        <p className={`text-[10px] font-black flex items-center justify-center gap-1 text-emerald-500`}>
+                          <ShieldCheck className="w-3.5 h-3.5" />
+                          {activeProject.status}
+                        </p>
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
 
                 {/* Structured Project Timeline thread */}
                 <div className="space-y-3 pt-1">
-                  <div className="flex items-center justify-between px-1">
-                    <p className={`text-[10px] font-black uppercase tracking-widest ${isLight ? 'text-slate-500' : 'text-white/40'}`}>
-                      Gantt Task Milestones
-                    </p>
-                    <span className="text-[9px] font-bold opacity-60">Phase 3 of 5</span>
-                  </div>
-                  
-                  {/* Timeline vertical container */}
-                  <div className="relative pl-6 space-y-4">
-                    {/* Continuous vertical connector line */}
-                    <div className={`absolute top-2.5 bottom-2.5 left-2.5 w-0.5 border-l-2 border-dashed ${
-                      isLight ? 'border-slate-200' : 'border-sky-500/10'
-                    }`} />
-
-                    {[
-                      { title: 'Excavation & Shaft Concrete', progress: 100, date: '12 May to 18 May', desc: 'Concrete base curing and frame alignment verified by surveyor.', status: 'completed' },
-                      { title: 'Machine Hoist Installation', progress: 100, date: '19 May to 25 May', desc: 'Traction motor and governor assembly anchored successfully.', status: 'completed' },
-                      { title: 'Cabin & Door Alignment', progress: 75, date: '26 May to 04 June', desc: 'Satin steel visual pane panels and glass landing doors assembly.', status: 'ongoing' },
-                      { title: 'ARD Electrical Connection', progress: 0, date: '05 June to 10 June', desc: 'Auto Rescue Device routing, sensor boards and battery backup wiring.', status: 'pending' },
-                      { title: 'Final Inspector Certificate', progress: 0, date: '12 June to 15 June', desc: 'Statutory lift safety certificate clearance log by local officer.', status: 'pending' }
-                    ].map((task, idx) => {
-                      const isComp = task.status === 'completed';
-                      const isAct = task.status === 'ongoing';
-                      
-                      return (
-                        <div key={idx} className="relative group">
-                          {/* Left Absolute Circle Milestone Marker */}
-                          <div className={`absolute left-[-21px] top-1 w-4 h-4 rounded-full border-2 flex items-center justify-center z-10 transition-all ${
-                            isComp ? 'bg-emerald-500 border-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]' :
-                            isAct ? 'bg-sky-500 border-sky-400 animate-pulse shadow-[0_0_10px_rgba(14,165,233,0.5)]' :
-                            isLight ? 'bg-white border-slate-300 text-slate-400' : 'bg-[#0f1524] border-white/10 text-white/40'
-                          }`}>
-                            {isComp && <Check className="w-2.5 h-2.5 text-white stroke-[3.5]" />}
-                            {isAct && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
-                          </div>
-
-                          <div className={`p-3.5 rounded-xl border relative overflow-hidden transition-all duration-200 ${
-                            isLight 
-                              ? 'bg-white border-slate-200/70 hover:border-slate-300' 
-                              : 'bg-[#131b2e]/60 border-white/5 hover:border-sky-500/20'
-                          }`}>
-                            {/* Ambient background accent indicator on task status */}
-                            <div className="absolute top-0 left-0 bottom-0 bg-sky-500/5 transition-all" style={{ width: `${task.progress}%` }}></div>
-                            
-                            <div className="flex justify-between items-start relative z-10">
-                              <div>
-                                <h4 className={`text-xs font-black ${isLight ? 'text-slate-800' : 'text-white'}`}>
-                                  {task.title}
-                                </h4>
-                                <p className={`text-[9px] font-bold mt-0.5 flex items-center gap-1 ${isLight ? 'text-slate-500' : 'text-white/40'}`}>
-                                  <Calendar className="w-3 h-3 text-sky-500" />
-                                  {task.date}
-                                </p>
-                              </div>
-
-                              <span className={`text-[7px] font-black uppercase tracking-wider px-2 py-0.5 rounded border ${
-                                isComp ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' :
-                                isAct ? 'bg-sky-500/15 text-sky-600 dark:text-sky-300 border-sky-500/20 animate-pulse' :
-                                'bg-slate-500/10 text-slate-500 dark:text-slate-400 border-slate-500/15'
-                              }`}>
-                                {task.status}
-                              </span>
-                            </div>
-
-                            {/* Detailed Description */}
-                            <p className={`text-[10px] leading-relaxed mt-2 relative z-10 ${isLight ? 'text-slate-600' : 'text-white/60'}`}>
-                              {task.desc}
-                            </p>
-
-                            {/* Linear progress bar */}
-                            <div className="mt-3.5 h-[4px] bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden relative z-10">
-                              <div className="h-full bg-sky-50 rounded-full transition-all duration-300" style={{ width: `${task.progress}%` }}></div>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
+                  <p className={`text-[10px] font-black uppercase tracking-widest px-1 ${isLight ? 'text-slate-500' : 'text-white/40'}`}>
+                    Gantt Task Milestones
+                  </p>
+                  <div className={`rounded-2xl p-6 border text-center ${isLight ? 'bg-white border-slate-200' : 'bg-white/5 border-white/5'}`}>
+                    <p className={`text-xs font-bold ${isLight ? 'text-slate-500' : 'text-white/50'}`}>No milestones yet.</p>
+                    <p className={`text-[10px] mt-1 ${isLight ? 'text-slate-400' : 'text-white/30'}`}>Add project milestones to track progress.</p>
                   </div>
                 </div>
 
@@ -642,7 +585,8 @@ export default function ProjectTracker() {
                         <input 
                           type="date" 
                           required 
-                          defaultValue="2026-07-04" 
+                          value={paymentDate}
+                          onChange={(e) => setPaymentDate(e.target.value)}
                           className={`w-full rounded-xl px-3 py-2 outline-none border text-[11px] font-mono ${
                             isLight ? 'bg-white border-slate-200 text-slate-800' : 'bg-slate-950/40 border-white/10 text-white'
                           }`} 
@@ -938,120 +882,10 @@ export default function ProjectTracker() {
                     Available Export Databases
                   </p>
 
-                  <div className="grid grid-cols-2 gap-2.5 text-xs">
-                    {[
-                      { name: 'Lead Source Analyzer', size: '42 KB', count: '142 Rows', group: 'Sales & CRM' },
-                      { name: 'CRM Conversion Funnel', size: '28 KB', count: '96 Rows', group: 'Sales & CRM' },
-                      { name: 'Quotation Ledger Master', size: '105 KB', count: '542 Rows', group: 'Finance Ledger' },
-                      { name: 'PM Compliance SLA Logs', size: '210 KB', count: '1,240 Rows', group: 'Operations' },
-                      { name: 'AMC SLA Renewal audits', size: '84 KB', count: '312 Rows', group: 'Operations' },
-                      { name: 'Unpaid Invoices Tracker', size: '16 KB', count: '48 Rows', group: 'Finance Ledger' },
-                      { name: 'Field Breakdown Audits', size: '148 KB', count: '612 Rows', group: 'Operations' },
-                      { name: 'Client Feedback Surveys', size: '32 KB', count: '180 Rows', group: 'Sales & CRM' }
-                    ].map((rep) => (
-                      <button
-                        key={rep.name}
-                        type="button"
-                        onClick={() => triggerAlert(`Compiling active records and exporting ${rep.name} to Excel template!`)}
-                        className={`p-3 border rounded-xl text-left transition-all flex flex-col justify-between cursor-pointer group active:scale-97 hover:shadow-md ${
-                          isLight 
-                            ? 'bg-white hover:bg-slate-50 border-slate-200 shadow-sm shadow-slate-100' 
-                            : 'bg-[#131b2e]/60 hover:bg-[#1c2744] border-white/5'
-                        }`}
-                      >
-                        <div className="w-full">
-                          <span className="text-[7px] font-black uppercase text-sky-400 block tracking-wider mb-0.5">
-                            {rep.group}
-                          </span>
-                          <h6 className={`text-[11px] font-black truncate leading-tight ${isLight ? 'text-slate-800' : 'text-white/95 group-hover:text-white'}`}>
-                            {rep.name}
-                          </h6>
-                        </div>
-
-                        <div className="w-full flex justify-between items-center mt-3 border-t pt-1.5 dark:border-white/5">
-                          <span className={`text-[8px] font-mono opacity-50`}>{rep.size} · {rep.count}</span>
-                          <Download className="w-3.5 h-3.5 text-sky-500 group-hover:translate-y-0.5 transition-transform" />
-                        </div>
-                      </button>
-                    ))}
+                  <div className={`rounded-2xl p-6 border text-center ${isLight ? 'bg-white border-slate-200' : 'bg-white/5 border-white/5'}`}>
+                    <p className={`text-xs font-bold ${isLight ? 'text-slate-500' : 'text-white/50'}`}>No MIS reports generated yet.</p>
+                    <p className={`text-[10px] mt-1 ${isLight ? 'text-slate-400' : 'text-white/30'}`}>Reports will appear here once you export data.</p>
                   </div>
-                </div>
-
-              </div>
-            )}
-
-            {/* 5.5 CLIENT PROPOSAL SUB-TAB */}
-            {activeSubTab === 'proposal' && (
-              <div className="space-y-4">
-                
-                <div className={`rounded-2xl p-4.5 border shadow-lg space-y-3 relative overflow-hidden ${
-                  isLight ? 'bg-white border-slate-200' : 'bg-[#131b2e] border-white/10'
-                }`}>
-                  <div className="absolute right-[-15px] bottom-[-15px] opacity-10 pointer-events-none">
-                    <Sparkles className={`w-24 h-24 ${isLight ? 'text-slate-300' : 'text-sky-400'}`} />
-                  </div>
-                  
-                  <span className="text-[8px] bg-sky-500/15 text-sky-600 dark:text-sky-400 font-black px-2.5 py-0.5 rounded border border-sky-400/20 uppercase tracking-widest block w-max">
-                    Enterprise Proposals
-                  </span>
-                  <h4 className={`text-sm font-black uppercase tracking-tight ${isLight ? 'text-slate-900' : 'text-white'}`}>
-                    Dynamic Presentation & Proposal
-                  </h4>
-                  <p className={`text-[11px] leading-relaxed ${isLight ? 'text-slate-500' : 'text-white/60'}`}>
-                    Generate a breathtaking, landscape-oriented PDF slide deck summarizing all 14 stages of ElevatorPlus, custom-tailored to your target client.
-                  </p>
-                </div>
-
-                {/* Customizer form inside phone view */}
-                <div className={`rounded-2xl p-4.5 border shadow-lg space-y-4 ${
-                  isLight ? 'bg-white border-slate-200' : 'bg-[#131b2e] border-white/5'
-                }`}>
-                  <p className={`text-[10px] font-black uppercase tracking-wider ${isLight ? 'text-slate-500' : 'text-white/40'}`}>
-                    Customize Proposal Details
-                  </p>
-
-                  <div className="space-y-3">
-                    <div>
-                      <label className={`text-[9px] font-bold uppercase tracking-wider block mb-1 ${isLight ? 'text-slate-500' : 'text-white/40'}`}>Client Name</label>
-                      <input 
-                        type="text" 
-                        defaultValue="Patil Industries" 
-                        id="proposal-client-name"
-                        className={`w-full p-2.5 rounded-xl text-xs font-semibold border ${
-                          isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/40 border-white/5'
-                        } focus:outline-none focus:border-sky-500`}
-                        placeholder="Enter Client Name..."
-                      />
-                    </div>
-
-                    <div>
-                      <label className={`text-[9px] font-bold uppercase tracking-wider block mb-1 ${isLight ? 'text-slate-500' : 'text-white/40'}`}>Proposed Budget</label>
-                      <input 
-                        type="text" 
-                        defaultValue="AED 2,450,000"
-                        id="proposal-budget-amount"
-                        className={`w-full p-2.5 rounded-xl text-xs font-semibold border ${
-                          isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/40 border-white/5'
-                        } focus:outline-none focus:border-sky-500`}
-                        placeholder="Enter Proposed Amount..."
-                      />
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const clientInput = document.getElementById('proposal-client-name') as HTMLInputElement;
-                      const budgetInput = document.getElementById('proposal-budget-amount') as HTMLInputElement;
-                      const client = clientInput?.value || 'Emaar Properties';
-                      const budget = budgetInput?.value || 'AED 2,450,000';
-                      navigate(`/proposal?client=${encodeURIComponent(client)}&amount=${encodeURIComponent(budget)}`);
-                    }}
-                    className="w-full py-3 rounded-xl text-xs font-bold uppercase tracking-wider bg-sky-500 hover:bg-sky-600 text-white transition active:scale-97 shadow-lg shadow-sky-500/20 cursor-pointer flex items-center justify-center gap-2"
-                  >
-                    <Sparkles className="w-4 h-4" />
-                    <span>Launch Landscape Slide Deck</span>
-                  </button>
                 </div>
 
               </div>

@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { collection, onSnapshot, doc, setDoc } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from 'firebase/auth';
+import { doc, setDoc, onSnapshot } from 'firebase/firestore';
+import { auth, db } from '../lib/firebase';
 
 export type AppTheme = 'dark' | 'light';
 
@@ -42,29 +43,17 @@ export interface UserAccount {
   id: string;
   name: string;
   email: string;
-  password?: string;
   role: string;
   phone: string;
   region: string;
   profilePic: string;
+  createdAt: string;
+  fcmToken?: string;
 }
-
-const DEFAULT_USERS: UserAccount[] = [
-  {
-    id: 'usr-sarah',
-    name: 'Sarah Connor',
-    email: 'sarah@tajlifts.com',
-    password: 'password123',
-    role: 'Taj Operations Lead',
-    phone: '+971 50 123 4567',
-    region: 'Dubai Marina & JBR',
-    profilePic: AVATAR_PRESETS[0].url
-  }
-];
 
 interface ProfileContextType {
   currentUser: UserAccount | null;
-  users: UserAccount[];
+  authLoading: boolean;
   profilePic: string;
   setProfilePic: (url: string) => void;
   name: string;
@@ -84,113 +73,95 @@ interface ProfileContextType {
   isBiometricallyVerified: boolean;
   setIsBiometricallyVerified: (status: boolean) => void;
   lockSession: () => void;
-  login: (email: string, password: string) => boolean;
-  signup: (name: string, email: string, password: string, role: string, phone: string, region: string, profilePic: string) => boolean;
-  logout: () => void;
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  signup: (name: string, email: string, password: string, role: string, phone: string, region: string, profilePic: string) => Promise<{ success: boolean; error?: string }>;
+  logout: () => Promise<void>;
 }
 
 const ProfileContext = createContext<ProfileContextType | undefined>(undefined);
 
+function getFirebaseErrorMessage(error: any): string {
+  const code = error?.code || '';
+  const map: Record<string, string> = {
+    'auth/user-not-found': 'No account found with this email.',
+    'auth/wrong-password': 'Incorrect password.',
+    'auth/invalid-credential': 'Invalid email or password.',
+    'auth/email-already-in-use': 'An account with this email already exists.',
+    'auth/weak-password': 'Password must be at least 6 characters.',
+    'auth/too-many-requests': 'Too many attempts. Please try again later.',
+    'auth/invalid-email': 'Invalid email address.',
+    'auth/user-disabled': 'This account has been disabled.',
+  };
+  return map[code] || error?.message || 'An unexpected error occurred.';
+}
+
 export function ProfileProvider({ children }: { children: React.ReactNode }) {
-  const [users, setUsers] = useState<UserAccount[]>(() => {
-    const saved = localStorage.getItem('taj_users_db');
-    return saved ? JSON.parse(saved) : DEFAULT_USERS;
-  });
+  const [currentUser, setCurrentUser] = useState<UserAccount | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
 
-  const [currentUser, setCurrentUser] = useState<UserAccount | null>(() => {
-    const saved = localStorage.getItem('taj_current_user');
-    return saved ? JSON.parse(saved) : null;
-  });
-
-  const [profilePic, setProfilePic] = useState<string>(() => {
-    return localStorage.getItem('taj_profile_pic') || AVATAR_PRESETS[0].url;
-  });
-  const [name, setName] = useState<string>(() => {
-    return localStorage.getItem('taj_profile_name') || 'Sarah Connor';
-  });
-  const [role, setRole] = useState<string>(() => {
-    return localStorage.getItem('taj_profile_role') || 'Taj Operations Lead';
-  });
+  const [profilePic, setProfilePic] = useState<string>(AVATAR_PRESETS[0].url);
+  const [name, setName] = useState<string>('');
+  const [role, setRole] = useState<string>('');
   const [theme, setTheme] = useState<AppTheme>(() => {
-    return (localStorage.getItem('taj_theme') as AppTheme) || 'dark';
+    return (localStorage.getItem('taj_theme') as AppTheme) || 'light';
   });
-  const [isAvailable, setIsAvailable] = useState<boolean>(() => {
-    const saved = localStorage.getItem('taj_profile_avail');
-    return saved !== null ? saved === 'true' : true;
-  });
-  const [phone, setPhone] = useState<string>(() => {
-    return localStorage.getItem('taj_profile_phone') || '+971 50 123 4567';
-  });
-  const [region, setRegion] = useState<string>(() => {
-    return localStorage.getItem('taj_profile_region') || 'Dubai Marina & JBR';
-  });
+  const [isAvailable, setIsAvailable] = useState<boolean>(true);
+  const [phone, setPhone] = useState<string>('');
+  const [region, setRegion] = useState<string>('');
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
 
-  const [isBiometricallyVerified, setIsBiometricallyVerified] = useState<boolean>(() => {
-    return sessionStorage.getItem('taj_biometric_verified') === 'true';
-  });
+  const [isBiometricallyVerified, setIsBiometricallyVerified] = useState<boolean>(false);
 
   const lockSession = () => {
-    sessionStorage.removeItem('taj_biometric_verified');
     setIsBiometricallyVerified(false);
   };
 
-  // Sync isBiometricallyVerified state
-  useEffect(() => {
-    if (isBiometricallyVerified) {
-      sessionStorage.setItem('taj_biometric_verified', 'true');
-    } else {
-      sessionStorage.removeItem('taj_biometric_verified');
-    }
-  }, [isBiometricallyVerified]);
+  // Listen to Firebase Auth state
+  const firestoreUnsubscribeRef = useRef<(() => void) | null>(null);
 
-  // 1. Real-time Firestore synchronization for users collection
   useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, "users"), (snapshot) => {
-      if (snapshot.empty) {
-        // If Firestore is completely fresh, seed it with the default admin user
-        DEFAULT_USERS.forEach((u) => {
-          setDoc(doc(db, "users", u.id), u).catch(err => console.error("Error seeding default user:", err));
-        });
-      } else {
-        const list: UserAccount[] = [];
-        snapshot.forEach((doc) => {
-          list.push(doc.data() as UserAccount);
-        });
-        setUsers(list);
+    const unsubAuth = onAuthStateChanged(auth, (firebaseUser) => {
+      if (firestoreUnsubscribeRef.current) {
+        firestoreUnsubscribeRef.current();
+        firestoreUnsubscribeRef.current = null;
       }
-    }, (error) => {
-      console.error("Firestore onSnapshot users error:", error);
+
+      if (firebaseUser) {
+        const unsubUser = onSnapshot(doc(db, "users", firebaseUser.uid), (snap) => {
+          if (snap.exists()) {
+            const userData = snap.data() as UserAccount;
+            setCurrentUser(userData);
+            setProfilePic(userData.profilePic);
+            setName(userData.name);
+            setRole(userData.role);
+            setPhone(userData.phone);
+            setRegion(userData.region);
+          }
+        });
+        firestoreUnsubscribeRef.current = unsubUser;
+      } else {
+        setCurrentUser(null);
+        setProfilePic(AVATAR_PRESETS[0].url);
+        setName('');
+        setRole('');
+        setPhone('');
+        setRegion('');
+      }
+      setAuthLoading(false);
     });
-    return () => unsubscribe();
+
+    return () => {
+      unsubAuth();
+      if (firestoreUnsubscribeRef.current) {
+        firestoreUnsubscribeRef.current();
+      }
+    };
   }, []);
 
-  // Sync users list to localStorage as a fallback
-  useEffect(() => {
-    localStorage.setItem('taj_users_db', JSON.stringify(users));
-  }, [users]);
-
-  // Sync current user session
-  useEffect(() => {
-    if (currentUser) {
-      localStorage.setItem('taj_current_user', JSON.stringify(currentUser));
-      // Populate active profile state fields
-      setProfilePic(currentUser.profilePic);
-      setName(currentUser.name);
-      setRole(currentUser.role);
-      setPhone(currentUser.phone);
-      setRegion(currentUser.region);
-    } else {
-      localStorage.removeItem('taj_current_user');
-    }
-  }, [currentUser]);
-
-  // Sync individual profile changes back to current user object & users database
+  // Sync profile changes back to Firestore
   useEffect(() => {
     if (currentUser) {
       const updatedUser = { ...currentUser, name, role, phone, region, profilePic };
-      
-      // Deep equal check to avoid infinite feedback loops
       if (
         currentUser.name !== name ||
         currentUser.role !== role ||
@@ -199,53 +170,24 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
         currentUser.profilePic !== profilePic
       ) {
         setCurrentUser(updatedUser);
-        setUsers(prev => prev.map(u => u.email === currentUser.email ? updatedUser : u));
-        
-        // Save profile modifications to Firestore
         setDoc(doc(db, "users", currentUser.id), updatedUser).catch(console.error);
       }
     }
   }, [name, role, phone, region, profilePic]);
 
-  // Sync state to localstorage
-  useEffect(() => {
-    localStorage.setItem('taj_profile_pic', profilePic);
-  }, [profilePic]);
+  // Persist theme preference
+  useEffect(() => { localStorage.setItem('taj_theme', theme); }, [theme]);
 
-  useEffect(() => {
-    localStorage.setItem('taj_profile_name', name);
-  }, [name]);
-
-  useEffect(() => {
-    localStorage.setItem('taj_profile_role', role);
-  }, [role]);
-
-  useEffect(() => {
-    localStorage.setItem('taj_theme', theme);
-  }, [theme]);
-
-  useEffect(() => {
-    localStorage.setItem('taj_profile_avail', String(isAvailable));
-  }, [isAvailable]);
-
-  useEffect(() => {
-    localStorage.setItem('taj_profile_phone', phone);
-  }, [phone]);
-
-  useEffect(() => {
-    localStorage.setItem('taj_profile_region', region);
-  }, [region]);
-
-  const login = (email: string, password: string): boolean => {
-    const found = users.find(u => u.email.toLowerCase() === email.toLowerCase() && u.password === password);
-    if (found) {
-      setCurrentUser(found);
-      return true;
+  const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+      return { success: true };
+    } catch (error: any) {
+      return { success: false, error: getFirebaseErrorMessage(error) };
     }
-    return false;
   };
 
-  const signup = (
+  const signup = async (
     name: string,
     email: string,
     password: string,
@@ -253,44 +195,36 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
     phone: string,
     region: string,
     profilePic: string
-  ): boolean => {
-    const exists = users.some(u => u.email.toLowerCase() === email.toLowerCase());
-    if (exists) return false;
-
-    const newUser: UserAccount = {
-      id: `usr-${Date.now()}`,
-      name,
-      email,
-      password,
-      role,
-      phone,
-      region,
-      profilePic
-    };
-
-    // Optimistic update
-    setUsers(prev => [...prev, newUser]);
-    setCurrentUser(newUser);
-
-    // Save to real Firestore database immediately
-    setDoc(doc(db, "users", newUser.id), newUser).catch((err) => {
-      console.error("Firestore user creation failed:", err);
-    });
-
-    return true;
+  ): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const cred = await createUserWithEmailAndPassword(auth, email, password);
+      const newUser: UserAccount = {
+        id: cred.user.uid,
+        name,
+        email,
+        role,
+        phone,
+        region,
+        profilePic,
+        createdAt: new Date().toISOString(),
+      };
+      await setDoc(doc(db, "users", cred.user.uid), newUser);
+      return { success: true };
+    } catch (error: any) {
+      return { success: false, error: getFirebaseErrorMessage(error) };
+    }
   };
 
-  const logout = () => {
-    setCurrentUser(null);
+  const logout = async () => {
+    await signOut(auth);
     setIsBiometricallyVerified(false);
-    sessionStorage.removeItem('taj_biometric_verified');
   };
 
   return (
     <ProfileContext.Provider
       value={{
         currentUser,
-        users,
+        authLoading,
         profilePic,
         setProfilePic,
         name,

@@ -16,16 +16,17 @@ export default function SignUp() {
   const [phone, setPhone] = useState('');
   const [region, setRegion] = useState('Dubai South & Jebel Ali');
   const [role, setRole] = useState('Field Technician');
-  const [selectedAvatar, setSelectedAvatar] = useState(AVATAR_PRESETS[1].url); // default to second preset
+  const [selectedAvatar, setSelectedAvatar] = useState(AVATAR_PRESETS[1].url);
 
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const [isLegalOpen, setIsLegalOpen] = useState(false);
   const [legalTab, setLegalTab] = useState<'privacy' | 'terms' | 'cca'>('privacy');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
@@ -39,21 +40,23 @@ export default function SignUp() {
       return;
     }
 
-    const ok = signup(name, email, password, role, phone, region, selectedAvatar);
-    if (ok) {
+    setLoading(true);
+    const result = await signup(name, email, password, role, phone, region, selectedAvatar);
+    setLoading(false);
+
+    if (result.success) {
       setSuccess(true);
       setTimeout(() => {
         navigate('/');
       }, 800);
     } else {
-      setError('An account with this email address already exists.');
+      setError(result.error || 'An account with this email address already exists.');
     }
   };
 
   return (
     <div className="w-full h-full flex flex-col justify-between p-5 overflow-y-auto no-scrollbar">
       
-      {/* Brand / Logo Header */}
       <div className="flex items-center gap-3 justify-center mt-2 flex-none">
         <div className="scale-90">
           <TajLogo />
@@ -68,7 +71,6 @@ export default function SignUp() {
         </div>
       </div>
 
-      {/* Main Form Content Card */}
       <div className={`my-3 py-4 px-4 rounded-[24px] border shadow-2xl space-y-3.5 transition-all duration-300 flex-1 flex flex-col justify-center ${
         isLight ? 'bg-white border-slate-200 text-slate-800' : 'bg-white/10 backdrop-blur-md border-white/10 text-white'
       }`}>
@@ -94,7 +96,6 @@ export default function SignUp() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-2.5 overflow-y-auto no-scrollbar max-h-[350px] pr-0.5">
-          {/* Avatar preset selection */}
           <div className="space-y-1">
             <span className="text-[8px] font-black uppercase tracking-wider block opacity-75">
               Choose Avatar Profile Pic
@@ -122,7 +123,6 @@ export default function SignUp() {
             </div>
           </div>
 
-          {/* Full Name */}
           <div className="space-y-0.5">
             <label className="text-[8px] font-black uppercase tracking-wider block opacity-75">
               Full Name
@@ -144,7 +144,6 @@ export default function SignUp() {
             </div>
           </div>
 
-          {/* Email */}
           <div className="space-y-0.5">
             <label className="text-[8px] font-black uppercase tracking-wider block opacity-75">
               Work Email Address
@@ -166,7 +165,6 @@ export default function SignUp() {
             </div>
           </div>
 
-          {/* Password */}
           <div className="space-y-0.5">
             <label className="text-[8px] font-black uppercase tracking-wider block opacity-75">
               Password (Min 6 chars)
@@ -195,7 +193,6 @@ export default function SignUp() {
             </div>
           </div>
 
-          {/* Phone */}
           <div className="space-y-0.5">
             <label className="text-[8px] font-black uppercase tracking-wider block opacity-75">
               Operational Mobile Phone
@@ -217,9 +214,7 @@ export default function SignUp() {
             </div>
           </div>
 
-          {/* Role & Region Selects in row */}
           <div className="grid grid-cols-2 gap-2">
-            {/* Role */}
             <div className="space-y-0.5">
               <label className="text-[8px] font-black uppercase tracking-wider block opacity-75">
                 Staff Role
@@ -243,7 +238,6 @@ export default function SignUp() {
               </div>
             </div>
 
-            {/* Region */}
             <div className="space-y-0.5">
               <label className="text-[8px] font-black uppercase tracking-wider block opacity-75">
                 Assigned Territory
@@ -268,7 +262,6 @@ export default function SignUp() {
             </div>
           </div>
 
-          {/* Legal Compliance Acceptance Text */}
           <p className={`text-[8.5px] leading-relaxed text-center mt-2.5 px-1 font-medium ${
             isLight ? 'text-slate-500' : 'text-slate-400'
           }`}>
@@ -310,14 +303,16 @@ export default function SignUp() {
 
           <button
             type="submit"
-            disabled={success}
+            disabled={success || loading}
             className={`w-full mt-2 py-2 rounded-xl font-extrabold text-[10px] uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer shadow-lg transition-all duration-200 ${
               success
                 ? 'bg-emerald-500 text-white'
+                : loading
+                ? 'bg-sky-400 text-white opacity-70'
                 : 'bg-sky-500 text-white hover:bg-sky-600 shadow-sky-500/10'
             }`}
           >
-            <span>Create Account</span>
+            <span>{loading ? 'Creating Account...' : 'Create Account'}</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </form>
@@ -330,7 +325,6 @@ export default function SignUp() {
         />
       </div>
 
-      {/* Sign In Navigation Footer */}
       <div className="text-center py-1 flex-none">
         <p className={`text-[10px] font-bold ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
           Already registered in dispatch?

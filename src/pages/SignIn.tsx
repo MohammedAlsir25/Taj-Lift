@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useProfile } from '../components/ProfileContext';
-import { Zap, Mail, Lock, Eye, EyeOff, ArrowRight, ShieldAlert, Sparkles, CheckCircle } from 'lucide-react';
+import { Zap, Mail, Lock, Eye, EyeOff, ArrowRight, ShieldAlert, CheckCircle } from 'lucide-react';
 import TajLogo from '../components/TajLogo';
 import LegalModal from '../components/LegalModal';
 
@@ -15,11 +15,12 @@ export default function SignIn() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const [isLegalOpen, setIsLegalOpen] = useState(false);
   const [legalTab, setLegalTab] = useState<'privacy' | 'terms' | 'cca'>('privacy');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     
@@ -28,27 +29,23 @@ export default function SignIn() {
       return;
     }
 
-    const ok = login(email, password);
-    if (ok) {
+    setLoading(true);
+    const result = await login(email, password);
+    setLoading(false);
+
+    if (result.success) {
       setSuccess(true);
       setTimeout(() => {
         navigate('/');
       }, 800);
     } else {
-      setError('Invalid email address or password.');
+      setError(result.error || 'Invalid email address or password.');
     }
-  };
-
-  const handleFillDemo = () => {
-    setEmail('sarah@tajlifts.com');
-    setPassword('password123');
-    setError('');
   };
 
   return (
     <div className="w-full h-full flex flex-col justify-between p-6 overflow-y-auto no-scrollbar">
       
-      {/* Upper Brand / Logo Header */}
       <div className="flex flex-col items-center text-center mt-4">
         <div className="scale-110 mb-3.5">
           <TajLogo />
@@ -61,7 +58,6 @@ export default function SignIn() {
         </p>
       </div>
 
-      {/* Main Content Card */}
       <div className={`my-auto py-5 px-4.5 rounded-[24px] border shadow-2xl space-y-4 transition-all duration-300 ${
         isLight ? 'bg-white border-slate-200 text-slate-800' : 'bg-white/10 backdrop-blur-md border-white/10 text-white'
       }`}>
@@ -87,7 +83,6 @@ export default function SignIn() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-3.5">
-          {/* Email input */}
           <div className="space-y-1">
             <label className="text-[9px] font-black uppercase tracking-wider block opacity-75">
               Work Email Address
@@ -109,7 +104,6 @@ export default function SignIn() {
             </div>
           </div>
 
-          {/* Password input */}
           <div className="space-y-1">
             <div className="flex justify-between items-center">
               <label className="text-[9px] font-black uppercase tracking-wider block opacity-75">
@@ -145,39 +139,21 @@ export default function SignIn() {
 
           <button
             type="submit"
-            disabled={success}
+            disabled={success || loading}
             className={`w-full py-2.5 rounded-xl font-extrabold text-[10px] uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer shadow-lg transition-all duration-200 ${
               success
                 ? 'bg-emerald-500 text-white'
+                : loading
+                ? 'bg-sky-400 text-white opacity-70'
                 : 'bg-sky-500 text-white hover:bg-sky-600 shadow-sky-500/10'
             }`}
           >
-            <span>Access Portal</span>
+            <span>{loading ? 'Signing in...' : 'Access Portal'}</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </form>
-
-        {/* Quick Fill Demo Banner */}
-        <div 
-          onClick={handleFillDemo}
-          className={`p-2.5 rounded-xl border border-dashed flex items-center justify-between cursor-pointer transition-all duration-200 hover:scale-[1.01] active:scale-99 ${
-            isLight 
-              ? 'bg-sky-50/50 border-sky-200 text-slate-700 hover:bg-sky-50' 
-              : 'bg-sky-500/5 border-sky-500/20 text-white/90 hover:bg-sky-500/10'
-          }`}
-        >
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
-            <div className="text-left">
-              <p className="text-[9px] font-black uppercase text-sky-400">Testing Credentials</p>
-              <p className="text-[8px] opacity-75 font-medium">Click to fill default lead Sarah Connor</p>
-            </div>
-          </div>
-          <span className="text-[8px] bg-sky-500/10 text-sky-400 px-1.5 py-0.5 rounded font-bold uppercase">Fill</span>
-        </div>
       </div>
 
-      {/* Sign Up Navigation Footer */}
       <div className="text-center py-2 space-y-3 flex-none">
         <div>
           <p className={`text-[10px] font-bold ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
@@ -191,7 +167,6 @@ export default function SignIn() {
           </Link>
         </div>
 
-        {/* Small footer compliance links */}
         <div className="flex items-center justify-center gap-3 border-t border-slate-500/10 pt-2.5 text-[8.5px] font-extrabold uppercase tracking-wider">
           <button
             type="button"

@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "700798801107",
+    "project_id": "gen-lang-client-0121446000",
+    "storage_bucket": "gen-lang-client-0121446000.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:700798801107:android:ca1cc58fb91635a3de3026",
+        "android_client_info": {
+          "package_name": "com.tajlift.management"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "700798801107-g14k8d2llt1uo9vt48bq0motruijpt8m.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCMupp2WjGD8TnM-vtjkHvb1z_elw8ASjM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "700798801107-g14k8d2llt1uo9vt48bq0motruijpt8m.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

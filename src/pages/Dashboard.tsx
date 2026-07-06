@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { ArrowUpRight, TrendingUp, ShieldAlert, CheckCircle2, ChevronRight, BarChart3, AlertCircle, Sparkles, DollarSign } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -8,6 +8,8 @@ import { useProfile } from '../components/ProfileContext';
 import { useProjects } from '../components/ProjectContext';
 import { YStack, XStack, Heading, Text, Card, Button } from '../components/Tamagui';
 import RotatingText from '../components/RotatingText';
+import { collection, onSnapshot, query, where } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -29,6 +31,30 @@ export default function Dashboard() {
   const [dashExpTitle, setDashExpTitle] = useState('');
   const [dashExpAmount, setDashExpAmount] = useState('');
   const [dashExpCat, setDashExpCat] = useState<'Materials' | 'Labor' | 'Permits' | 'Logistics' | 'Repairs' | 'Maintenance' | 'Other'>('Materials');
+
+  // Firestore computed stats
+  const [leads, setLeads] = useState<any[]>([]);
+  const [pmSlots, setPmSlots] = useState<any[]>([]);
+  const [breakdowns, setBreakdowns] = useState<any[]>([]);
+
+  useEffect(() => {
+    const unsubLeads = onSnapshot(collection(db, "leads"), (snap) => {
+      const list: any[] = [];
+      snap.forEach((d) => list.push(d.data()));
+      setLeads(list);
+    });
+    const unsubPm = onSnapshot(collection(db, "pm_slots"), (snap) => {
+      const list: any[] = [];
+      snap.forEach((d) => list.push(d.data()));
+      setPmSlots(list);
+    });
+    const unsubBd = onSnapshot(collection(db, "breakdowns"), (snap) => {
+      const list: any[] = [];
+      snap.forEach((d) => list.push(d.data()));
+      setBreakdowns(list);
+    });
+    return () => { unsubLeads(); unsubPm(); unsubBd(); };
+  }, []);
 
   const handleDashCreateProj = (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,53 +80,73 @@ export default function Dashboard() {
     setShowDashAddExp(false);
   };
 
-  // Exact metrics from PDF Page 11: "BirdEye Dashboard for Management"
+  // Computed stats from Firestore data
+  const leadsDone = leads.filter(l => l.status === 'Finalized' || l.status === 'Won').length;
+  const leadsPending = leads.filter(l => l.status === 'Pending' || l.status === 'New').length;
+  const leadsCancelled = leads.filter(l => l.status === 'Cancelled' || l.status === 'Lost').length;
+  const leadsQuotation = leads.filter(l => l.status === 'Quotation Raised' || l.status === 'Quotation').length;
+  const leadsTotal = leads.length;
+
   const enquiriesStats = {
-    total: 110,
+    total: leadsTotal || 0,
     categories: [
-      { name: 'Quotation Raised', value: 4, color: '#38bdf8' }, // sky-400
-      { name: 'Finalized', value: 72, color: '#10b981' },     // emerald-500
-      { name: 'Pending', value: 34, color: '#f59e0b' },       // amber-500
-      { name: 'Cancelled', value: 0, color: '#ef4444' },       // red-500
-      { name: 'Closed By Others', value: 0, color: '#94a3b8' } // slate-400
+      { name: 'Quotation Raised', value: leadsQuotation, color: '#38bdf8' },
+      { name: 'Finalized', value: leadsDone, color: '#10b981' },
+      { name: 'Pending', value: leadsPending, color: '#f59e0b' },
+      { name: 'Cancelled', value: leadsCancelled, color: '#ef4444' },
+      { name: 'Closed By Others', value: 0, color: '#94a3b8' }
     ],
-    percentage: 65, // Finalized %
+    percentage: leadsTotal > 0 ? Math.round((leadsDone / leadsTotal) * 100) : 0,
   };
+
+  const jobsDone = projects.filter(p => p.status === 'completed').length;
+  const jobsInProgress = projects.filter(p => p.status === 'ongoing').length;
+  const jobsPending = projects.filter(p => p.status === 'pending').length;
+  const jobsTotal = projects.length;
 
   const jobsStats = {
-    total: 108,
+    total: jobsTotal || 0,
     categories: [
-      { name: 'Work in progress', value: 3, color: '#38bdf8' },
-      { name: 'Pending', value: 36, color: '#f59e0b' },
-      { name: 'Completed', value: 67, color: '#10b981' },
-      { name: 'On hold', value: 1, color: '#a855f7' }          // purple-500
+      { name: 'Work in progress', value: jobsInProgress, color: '#38bdf8' },
+      { name: 'Pending', value: jobsPending, color: '#f59e0b' },
+      { name: 'Completed', value: jobsDone, color: '#10b981' },
+      { name: 'On hold', value: 0, color: '#a855f7' }
     ],
-    percentage: 62, // Completed %
+    percentage: jobsTotal > 0 ? Math.round((jobsDone / jobsTotal) * 100) : 0,
   };
+
+  const pmConfirmed = pmSlots.filter(s => s.status === 'confirmed' || s.status === 'Completed').length;
+  const pmPending = pmSlots.filter(s => s.status === 'pending').length;
+  const pmTotal = pmSlots.length;
 
   const pmStats = {
-    total: 107,
+    total: pmTotal || 0,
     categories: [
       { name: 'Sent', value: 0, color: '#38bdf8' },
-      { name: 'Under Discussion', value: 1, color: '#a855f7' },
-      { name: 'Pending', value: 11, color: '#f59e0b' },
-      { name: 'Confirmed', value: 94, color: '#10b981' },
+      { name: 'Under Discussion', value: 0, color: '#a855f7' },
+      { name: 'Pending', value: pmPending, color: '#f59e0b' },
+      { name: 'Confirmed', value: pmConfirmed, color: '#10b981' },
       { name: 'Cancelled', value: 0, color: '#ef4444' },
-      { name: 'Expired', value: 1, color: '#ec4899' }          // pink-500
+      { name: 'Expired', value: 0, color: '#ec4899' }
     ],
-    percentage: 88, // Confirmed %
+    percentage: pmTotal > 0 ? Math.round((pmConfirmed / pmTotal) * 100) : 0,
   };
 
+  const bdShutdown = breakdowns.filter(b => b.status === 'Shutdown' || b.status === 'emergency').length;
+  const bdResolved = breakdowns.filter(b => b.status === 'Resolved' || b.status === 'Elevator Started').length;
+  const bdOnHold = breakdowns.filter(b => b.status === 'On Hold').length;
+  const bdTotal = breakdowns.length;
+
   const breakdownStats = {
-    total: 63,
+    total: bdTotal || 0,
     categories: [
-      { name: 'Shutdown', value: 10, color: '#ef4444' },
-      { name: 'On Hold', value: 2, color: '#a855f7' },
+      { name: 'Shutdown', value: bdShutdown, color: '#ef4444' },
+      { name: 'On Hold', value: bdOnHold, color: '#a855f7' },
       { name: 'Pause', value: 0, color: '#94a3b8' },
-      { name: 'Live Emergency', value: 6, color: '#ec4899' },
-      { name: 'Elevator Started', value: 45, color: '#10b981' }
+      { name: 'Live Emergency', value: 0, color: '#ec4899' },
+      { name: 'Elevator Started', value: bdResolved, color: '#10b981' }
     ],
-    percentage: 71, // Elevator Started %
+    percentage: bdTotal > 0 ? Math.round((bdResolved / bdTotal) * 100) : 0,
   };
 
   return (
